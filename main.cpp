@@ -1,4 +1,5 @@
 #include <iostream>
+#include <print>
 #include <string>
 
 void setColor(int color) {
@@ -11,7 +12,11 @@ void resetColor() {
 }
 
 void clrScreen() {
+#ifdef _WIN32
+    system("cls");
+#else
     std::cout << "\033[2J\033[1;1H";
+#endif
 }
 
 void printHeader() {
@@ -24,30 +29,30 @@ void printHeader() {
     std::cout << asciiArt << std::endl;
 
     setColor(36);
-    std::cout << "Hello! Welcome to the CSOPESY commandline" << std::endl;
+    std::println("Hello, Welcome to the CSOPESY commandline!");
     resetColor();
 
     setColor(33);
-    std::cout << "Type 'exit' to quit, 'clear' to clear the screen"
-              << std::endl;
+    std::println("Type 'exit' to quit, 'clear' to clear the screen");
     resetColor();
 }
 
 void printPlaceholder(std::string command) {
-    std::cout << "'" << command << "'"
-              << " command recognized. Doing something." << std::endl;
+    std::println("'{}' command recognized. Doing something.", command);
 }
 
 int main() {
     printHeader();
     do {
         std::string input;
-        std::cout << "Enter a command: ";
+        std::print("Enter a command: ");
         std::getline(std::cin, input);
 
         if (input == "exit") {
             break;
-        } else if (input == "clear") {
+        }
+
+        if (input == "clear") {
             clrScreen();
             printHeader();
         } else if (input == "screen") {
@@ -57,6 +62,8 @@ int main() {
         } else if (input == "scheduler-stop") {
             printPlaceholder(input);
         } else if (input == "report-util") {
+            printPlaceholder(input);
+        } else if (input == "initialize") {
             printPlaceholder(input);
         } else {
             std::cout << "Unknown command: " << input << std::endl;
