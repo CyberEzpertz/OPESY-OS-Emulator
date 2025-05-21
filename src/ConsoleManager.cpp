@@ -2,6 +2,21 @@
 
 #include <print>
 
+/// Initializes a main menu screen when the singleton is created.
+/// @todo Once Main Menu Screen is done, uncomment this and implement it
+/// properly.
+ConsoleManager::ConsoleManager() {
+    // // Create the main menu screen
+    // auto mainMenu = std::make_shared<MainMenuScreen>();
+    //
+    // // Add it to available screens by its name
+    // availableScreens[mainMenu->getName()] = mainMenu;
+    //
+    // // Set it as the current screen
+    // currScreen = mainMenu;
+    // renderCurrScreen();
+}
+
 /// Returns a pointer to the lazily-initialized singleton instance.
 ///
 /// Uses a function-local static to ensure thread-safe initialization on first

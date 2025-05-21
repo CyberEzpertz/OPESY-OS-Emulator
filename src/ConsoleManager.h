@@ -43,6 +43,12 @@ public:
     /// @return True if the program should exit, false otherwise.
     bool getHasExited() const;
 
+    /// @brief Gets user input for the currently active screen.
+    ///
+    /// @note This function should call the `handleInput` method of the current
+    /// screen once the screen interface is defined.
+    void getUserInput();
+
     /// @brief Signals the program to exit.
     void exitProgram();
 
@@ -51,7 +57,7 @@ private:
     bool hasExited = false;
 
     /// @brief Private constructor to enforce singleton pattern.
-    ConsoleManager() = default;
+    ConsoleManager();
 
     /// @brief Clears the console screen using platform-specific commands.
     static void clearConsole();
@@ -61,12 +67,6 @@ private:
     /// @note This function should call the `render` method of the current
     /// screen once the screen interface is defined.
     void renderCurrScreen();
-
-    /// @brief Gets user input for the currently active screen.
-    ///
-    /// @note This function should call the `handleInput` method of the current
-    /// screen once the screen interface is defined.
-    void getUserInput();
 
     /// @brief The currently active screen.
     ///
