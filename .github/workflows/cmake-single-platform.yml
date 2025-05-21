@@ -17,7 +17,7 @@ jobs:
       - name: Install LLVM (latest)
         uses: KyleMayes/install-llvm-action@v1
         with:
-          version: "18"
+          version: "20.1.0"
 
       - name: Setup Ninja
         uses: seanmiddleditch/gha-setup-ninja@v5
@@ -46,7 +46,7 @@ jobs:
       - name: Install LLVM
         uses: KyleMayes/install-llvm-action@v1
         with:
-          version: "18"
+          version: "20.1.0"
 
       - name: Setup Ninja
         uses: seanmiddleditch/gha-setup-ninja@v5
