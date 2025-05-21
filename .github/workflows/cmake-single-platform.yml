@@ -1,6 +1,4 @@
-# This starter workflow is for a CMake project running on a single platform. There is a different starter workflow if you need cross-platform coverage.
-# See: https://github.com/actions/starter-workflows/blob/main/ci/cmake-multi-platform.yml
-name: Build with CMake
+name: Build and Lint
 
 on:
   push:
@@ -8,44 +6,56 @@ on:
   pull_request:
     branches: [ "main" ]
 
-env:
-  # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
-  BUILD_TYPE: Release
-
 jobs:
   lint:
-    runs-on: ubuntu-24.04
-    
+    runs-on: ubuntu-latest
+
     steps:
       - name: Checkout Project
-        uses: actions/checkout@v4.2.2
-      - name: Run clang-tidy
-        uses: HorstBaerbel/action-clang-tidy@1.2
-        # These are optional (defaults displayed)
-        with:
-          scandir: '.'
-          builddir: 'build'
-          excludedirs: ''
-          extensions: 'c,h,C,H,cpp,hpp,cc,hh,c++,h++,cxx,hxx'
-          cmakeoptions: ''
-  build:
-    # The CMake configure and build commands are platform agnostic and should work equally well on Windows or Mac.
-    # You can convert this to a matrix build if you need cross-platform coverage.
-    # See: https://docs.github.com/en/free-pro-team@latest/actions/learn-github-actions/managing-complex-workflows#using-a-build-matrix
-    runs-on: ubuntu-24.04
-    
-    steps:
-    - name: Checkout Project
-      uses: actions/checkout@v4.2.2
+        uses: actions/checkout@v4
 
-    - name: Setup Ninja
-      uses: seanmiddleditch/gha-setup-ninja@v5
-      
-    - name: Build Project
-      uses: threeal/cmake-action@v2.1.0
-      with:
-        generator: Ninja
-        cxx-compiler: clang++
-        options: |
-          DCMAKE_CXX_STANDARD=23
-    
+      - name: Install LLVM (latest)
+        uses: KyleMayes/install-llvm-action@v1
+        with:
+          version: "17" # Or "18" for bleeding-edge C++23 support
+
+      - name: Setup Ninja
+        uses: seanmiddleditch/gha-setup-ninja@v5
+
+      - name: Configure with CMake
+        run: |
+          cmake -B build \
+            -G Ninja \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -DCMAKE_CXX_STANDARD=23
+
+      - name: Run clang-tidy
+        run: |
+          # Example: run on all .cpp files in src/
+          find src -name '*.cpp' | xargs clang-tidy -p build
+
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Project
+        uses: actions/checkout@v4
+
+      - name: Install LLVM
+        uses: KyleMayes/install-llvm-action@v1
+        with:
+          version: "17"
+
+      - name: Setup Ninja
+        uses: seanmiddleditch/gha-setup-ninja@v5
+
+      - name: Build with CMake
+        run: |
+          cmake -B build \
+            -G Ninja \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_CXX_STANDARD=23
+          cmake --build build
