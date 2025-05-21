@@ -29,6 +29,5 @@ jobs:
       uses: threeal/cmake-action@v2.1.0
       with:
         generator: Ninja
-        cxx-compiler: clang++
         options: |
           DCMAKE_CXX_STANDARD=23
