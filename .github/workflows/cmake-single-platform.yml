@@ -14,11 +14,6 @@ jobs:
       - name: Checkout Project
         uses: actions/checkout@v4
 
-      - name: Install LLVM (latest)
-        uses: KyleMayes/install-llvm-action@v2
-        with:
-          version: "20.1.0"
-
       - name: Setup Ninja
         uses: seanmiddleditch/gha-setup-ninja@v5
 
@@ -42,11 +37,6 @@ jobs:
     steps:
       - name: Checkout Project
         uses: actions/checkout@v4
-
-      - name: Install LLVM
-        uses: KyleMayes/install-llvm-action@v2
-        with:
-          version: "20.1.0"
 
       - name: Setup Ninja
         uses: seanmiddleditch/gha-setup-ninja@v5
