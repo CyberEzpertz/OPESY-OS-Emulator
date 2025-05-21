@@ -50,7 +50,7 @@ void ConsoleManager::clearConsole() {
 #ifdef _WIN32
     system("cls");
 #else
-    std::cout << "\033[2J\033[1;1H";
+    std::print("\033[2J\033[1;1H");
 #endif
 }
 
