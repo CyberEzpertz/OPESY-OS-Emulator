@@ -2,6 +2,8 @@
 #include <print>
 #include <string>
 
+#include "ConsoleManager.h"
+
 void setColor(int color) {
     // ANSI escape codes for colors
     std::cout << "\033[" << color << "m";
@@ -42,6 +44,14 @@ void printPlaceholder(std::string command) {
 }
 
 int main() {
+    auto* console = ConsoleManager::getInstance();
+
+    // TODO: Uncomment this once done with new implementation of main menu
+    // while (!console->getHasExited()) {
+    //     console->getUserInput();
+    // }
+
+    // TODO: Remove this once new implementation has been implemented.
     printHeader();
     do {
         std::string input;
