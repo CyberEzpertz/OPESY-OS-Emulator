@@ -17,7 +17,7 @@ jobs:
       - name: Install LLVM (latest)
         uses: KyleMayes/install-llvm-action@v1
         with:
-          version: "18.1.0" # Or "18" for bleeding-edge C++23 support
+          version: "18"
 
       - name: Setup Ninja
         uses: seanmiddleditch/gha-setup-ninja@v5
@@ -46,7 +46,7 @@ jobs:
       - name: Install LLVM
         uses: KyleMayes/install-llvm-action@v1
         with:
-          version: "18.1.0"
+          version: "18"
 
       - name: Setup Ninja
         uses: seanmiddleditch/gha-setup-ninja@v5
