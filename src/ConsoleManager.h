@@ -12,18 +12,20 @@ public:
     void operator=(ConsoleManager const&) = delete;
     static ConsoleManager* getInstance();
 
-    void switchScreen(std::string screenName);
-    void addScreen(std::string screenName, std::shared_ptr<std::any> screenPtr);
-    void removeScreen(std::string screenName);
+    void switchScreen(const std::string& screenName);
+    void addScreen(const std::string& screenName,
+                   const std::shared_ptr<std::any>& screenPtr);
+    void removeScreen(const std::string& screenName);
 
-    bool getHasExited();
+    bool getHasExited() const;
     void exitProgram();
 
 private:
     static ConsoleManager* instancePtr;
     bool hasExited = false;
+    ConsoleManager() = default;
 
-    void clearScreen();
+    static void clearConsole();
     void renderCurrScreen();
     void getUserInput();
 
