@@ -4,6 +4,8 @@ project(os_emulator VERSION 0.1.0 LANGUAGES C CXX)
 add_executable(os_emulator src/main.cpp
         src/ConsoleManager.cpp
         src/ConsoleManager.h
+        src/Process.cpp
+        src/Process.h
 )
 
 set_property(TARGET os_emulator PROPERTY CXX_STANDARD 23)
