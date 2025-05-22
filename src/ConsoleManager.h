@@ -26,18 +26,12 @@ public:
     static ConsoleManager* getInstance();
 
     /// @brief Switches the active screen to the given screen name.
-    /// @param screenName The name of the screen to switch to.
-    void switchScreen(const std::string& screenName);
+    /// @param processName The name of the screen to switch to.
+    void switchConsole(const std::string& processName);
 
-    /// @brief Adds a new screen to the manager.
-    /// @param screenName The name identifier of the screen.
-    /// @param screenPtr Shared pointer to the screen object.
-    void addScreen(const std::string& screenName,
-                   const std::shared_ptr<std::any>& screenPtr);
-
-    /// @brief Removes a screen by its name.
-    /// @param screenName The name identifier of the screen to remove.
-    void removeScreen(const std::string& screenName);
+    /// @brief Adds a new process to the manager.
+    /// @param processPtr Shared pointer to the process object.
+    void addProcess(const std::shared_ptr<std::any>& processPtr);
 
     /// @brief Returns whether the program is marked for exit.
     /// @return True if the program should exit, false otherwise.
@@ -66,17 +60,17 @@ private:
     ///
     /// @note This function should call the `render` method of the current
     /// screen once the screen interface is defined.
-    void renderCurrScreen();
+    void renderConsole();
 
     /// @brief The currently active screen.
     ///
     /// @note This should be changed to a pointer to a `Screen` class once it's
     /// created.
-    std::shared_ptr<std::any> currScreen;
+    std::shared_ptr<std::any> currentScreen;
 
-    /// @brief Map of available screens identified by name.
+    /// @brief Map of available processes identified by name.
     ///
-    /// @note Screen pointers are stored as `std::any` for now, but should be
-    /// changed to the appropriate screen type once it's implemented.
-    std::unordered_map<std::string, std::shared_ptr<std::any>> availableScreens;
+    /// @note Process pointers are stored as `std::any` for now, but should be
+    /// changed to the appropriate process type once it's implemented.
+    std::unordered_map<std::string, std::shared_ptr<std::any>> processes;
 };

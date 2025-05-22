@@ -26,21 +26,22 @@ ConsoleManager* ConsoleManager::getInstance() {
     return &instance;
 }
 
-/// Switches the active screen if the given screen name exists.
+/// Switches the active console if the given process name exists.
 ///
 /// Logs an error message if the screen name is not found.
-void ConsoleManager::switchScreen(const std::string& screenName) {
-    if (availableScreens.contains(screenName)) {
-        currScreen = availableScreens[screenName];
+void ConsoleManager::switchConsole(const std::string& processName) {
+    if (processes.contains(processName)) {
+        currentScreen = processes[processName];
     } else {
-        std::print("No process named {} was found.", screenName);
+        std::print("No process named {} was found.", processName);
     }
 }
 
-/// Registers a screen by name for future switching.
-void ConsoleManager::addScreen(const std::string& screenName,
-                               const std::shared_ptr<std::any>& screenPtr) {
-    availableScreens[screenName] = screenPtr;
+/// Registers a process using its name for future switching.
+void ConsoleManager::addProcess(const std::shared_ptr<std::any>& processPtr) {
+    // TODO: Uncomment this once process has been implemented.
+    // std::string processName = processPtr->getName();
+    // processes[processName] = processPtr;
 }
 
 /// Clears the terminal output using platform-specific commands.
@@ -54,18 +55,11 @@ void ConsoleManager::clearConsole() {
 #endif
 }
 
-/// Removes a screen by name from the list of available screens.
-///
-/// Does nothing if the screen name is not found.
-void ConsoleManager::removeScreen(const std::string& screenName) {
-    availableScreens.erase(screenName);
-}
-
 /// Renders the currently active screen.
 ///
 /// @todo Call the screen’s actual render function once the Screen interface is
 /// defined.
-void ConsoleManager::renderCurrScreen() {
+void ConsoleManager::renderConsole() {
     // TODO: Call the current screen's render method here
 }
 
