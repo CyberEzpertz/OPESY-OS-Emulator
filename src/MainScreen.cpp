@@ -113,7 +113,7 @@ void MainScreen::printHeader() {
         "| |___ ___) | |_| |  __/| |___ ___) || |  \n"
         " \\____|____/ \\___/|_|   |_____|____/ |_|  \n";
 
-    std::print(asciiArt);
+    std::print("{}", asciiArt);
 
     setColor(36);
     std::println("Hello, Welcome to the CSOPESY commandline!");
