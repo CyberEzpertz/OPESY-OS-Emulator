@@ -25,7 +25,7 @@ ConsoleManager::ConsoleManager() {
 ///
 /// Uses a function-local static to ensure thread-safe initialization on first
 /// call.
-const ConsoleManager& ConsoleManager::getInstance() {
+ConsoleManager& ConsoleManager::getInstance() {
     static ConsoleManager instance;
     return instance;
 }

@@ -10,7 +10,7 @@
 
 /// @brief Returns the singleton instance of MainScreen.
 /// @return A single shared instance of MainScreen.
-const MainScreen& MainScreen::getInstance() {
+MainScreen& MainScreen::getInstance() {
     static MainScreen instance;
     return instance;
 }
@@ -56,8 +56,7 @@ void MainScreen::handleUserInput() {
     const std::string& cmd = tokens[0];
 
     if (cmd == "exit") {
-        ConsoleManager::getInstance()
-            ->exitProgram();  // Trigger outer loop exit
+        ConsoleManager::getInstance().exitProgram();  // Trigger outer loop exit
     }
 
     else if (cmd == "clear") {
@@ -83,19 +82,6 @@ void MainScreen::handleUserInput() {
 /// @return A string representing the screen name.
 std::string MainScreen::getName() const {
     return "MainMenu";
-}
-
-/// @brief Splits a user input string into a list of space-separated tokens.
-/// @param input The full input line.
-/// @return A vector containing individual command tokens.
-std::vector<std::string> MainScreen::splitInput(const std::string& input) {
-    std::istringstream iss(input);
-    std::vector<std::string> tokens;
-    std::string token;
-    while (iss >> token) {
-        tokens.push_back(token);
-    }
-    return tokens;
 }
 
 /// @brief Sets the console text color using ANSI escape codes.
@@ -127,7 +113,7 @@ void MainScreen::printHeader() {
         "| |___ ___) | |_| |  __/| |___ ___) || |  \n"
         " \\____|____/ \\___/|_|   |_____|____/ |_|  \n";
 
-    std::cout << asciiArt << std::endl;
+    std::print(asciiArt);
 
     setColor(36);
     std::println("Hello, Welcome to the CSOPESY commandline!");

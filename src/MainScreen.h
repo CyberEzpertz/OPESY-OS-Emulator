@@ -21,7 +21,7 @@ public:
 
     /// @brief Provides access to the singleton instance of MainScreen.
     /// @return Reference to the single instance of MainScreen.
-    static const MainScreen& getInstance();
+    static MainScreen& getInstance();
 
     /// @brief Renders the main menu content to the console.
     void render() override;
@@ -32,7 +32,7 @@ public:
 
     /// @brief Returns the name identifier of this screen.
     /// @return A string representing the screen name.
-    std::string getName() const override;
+    [[nodiscard]] std::string getName() const override;
 
 private:
     /// @brief Private constructor to enforce singleton pattern.
@@ -54,9 +54,4 @@ private:
     /// @brief Displays a placeholder message for unimplemented commands.
     /// @param command The command entered by the user.
     static void printPlaceholder(const std::string& command);
-
-    /// @brief Splits user input into individual command arguments.
-    /// @param input The full input string from the user.
-    /// @return A vector of string tokens.
-    std::vector<std::string> splitInput(const std::string& input);
 };
