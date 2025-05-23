@@ -62,9 +62,11 @@ void MainScreen::handleUserInput() {
         printHeader();
     } else if (cmd == "screen" && tokens.size() >= 3) {
         if (tokens[1] == "-s") {
-            printPlaceholder("Create screen: " + tokens[2]);
+            auto newProcess = std::make_shared<Process>(1,tokens[2]);
+            ConsoleManager::getInstance().addProcess(newProcess);
+            ConsoleManager::getInstance().switchConsole(tokens[2]);
         } else if (tokens[1] == "-r") {
-            printPlaceholder("Resume screen: " + tokens[2]);
+            ConsoleManager::getInstance().switchConsole(tokens[2]);
         } else {
             std::cout << "Invalid screen option: " << tokens[1] << std::endl;
         }

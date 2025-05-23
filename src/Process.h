@@ -22,7 +22,7 @@ public:
      * @param id The unique identifier for the process.
      * @param name The name of the process.
      */
-    Process(int id, const std::string& name);
+    Process(int id, std::string  name);
 
     /**
      * @brief Gets the ID of the process.
@@ -34,13 +34,13 @@ public:
      * @brief Gets the name of the process.
      * @return Process name.
      */
-    const std::string& getName() const;
+    std::string getName() const;
 
     /**
      * @brief Gets the log entries of the process.
      * @return A vector of log strings.
      */
-    const std::vector<std::string>& getLogs() const;
+    std::vector<std::string> getLogs() const;
 
     /**
      * @brief Gets the current line the process is executing.
@@ -58,7 +58,7 @@ public:
      * @brief Gets the timestamp when the process was created.
      * @return A string containing the formatted timestamp.
      */
-    const std::string& getTimestamp() const;
+    std::string& getTimestamp();
 
     /**
      * @brief Adds a log entry to the process.
