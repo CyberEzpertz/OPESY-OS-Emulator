@@ -5,6 +5,8 @@
 #include <string>
 #include <unordered_map>
 
+#include "Screen.h"
+
 /// @class ConsoleManager
 /// @brief Manages console screen rendering and input handling using a singleton
 /// pattern.
@@ -66,11 +68,11 @@ private:
     ///
     /// @note This should be changed to a pointer to a `Screen` class once it's
     /// created.
-    std::shared_ptr<std::any> currentScreen;
+    std::shared_ptr<Screen> currentScreen;
 
     /// @brief Map of available processes identified by name.
     ///
     /// @note Process pointers are stored as `std::any` for now, but should be
     /// changed to the appropriate process type once it's implemented.
-    std::unordered_map<std::string, std::shared_ptr<std::any>> processes;
+    std::unordered_map<std::string, std::shared_ptr<Screen>> processes;
 };
