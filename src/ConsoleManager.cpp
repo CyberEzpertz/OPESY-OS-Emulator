@@ -1,20 +1,22 @@
 #include "ConsoleManager.h"
+#include "MainScreen.h"
 
 #include <print>
+
 
 /// Initializes a main menu screen when the singleton is created.
 /// @todo Once Main Menu Screen is done, uncomment this and implement it
 /// properly.
 ConsoleManager::ConsoleManager() {
-    // // Create the main menu screen
-    // auto mainMenu = std::make_shared<MainMenuScreen>();
-    //
-    // // Add it to available screens by its name
-    // availableScreens[mainMenu->getName()] = mainMenu;
-    //
-    // // Set it as the current screen
-    // currScreen = mainMenu;
-    // renderCurrScreen();
+    // Create the main menu screen
+    auto mainMenu = std::make_shared<MainScreen>();
+
+    // Add it to available screens by its name
+    availableScreens[mainMenu->getName()] = mainMenu;
+
+    // Set it as the current screen
+    currScreen = mainMenu;
+    renderCurrScreen();
 }
 
 /// Returns a pointer to the lazily-initialized singleton instance.
@@ -61,6 +63,7 @@ void ConsoleManager::clearConsole() {
 /// defined.
 void ConsoleManager::renderConsole() {
     // TODO: Call the current screen's render method here
+    currentScreen->render();
 }
 
 /// Passes user input to the currently active screen for handling.
@@ -69,6 +72,7 @@ void ConsoleManager::renderConsole() {
 /// defined.
 void ConsoleManager::getUserInput() {
     // TODO: Call the current screen's handleInput method here
+    currentScreen->handleUserInput();
 }
 
 /// Sets the exit flag to true, signaling the main loop to terminate.
