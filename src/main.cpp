@@ -5,12 +5,11 @@
 #include "ConsoleManager.h"
 #include "MainScreen.h"
 
-
 int main() {
-    auto* console = ConsoleManager::getInstance();
+    ConsoleManager& console = ConsoleManager::getInstance();
 
-    while (!console->getHasExited()) {
-        console->getUserInput();
+    while (!console.getHasExited()) {
+        console.getUserInput();
     }
 
     return 0;

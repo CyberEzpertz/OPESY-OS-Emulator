@@ -1,22 +1,14 @@
 #include "ConsoleManager.h"
-#include "MainScreen.h"
-#include "Process.h"
 
 #include <print>
 
+#include "MainScreen.h"
+#include "Process.h"
 
 /// Initializes a main menu screen when the singleton is created.
-/// @todo Once Main Menu Screen is done, uncomment this and implement it
-/// properly.
 ConsoleManager::ConsoleManager() {
-    // Create the main menu screen
-    const auto mainMenu = std::make_shared<MainScreen>(MainScreen::getInstance());
-
-    // Add it to available screens by its name
-    // availableScreens[mainMenu->getName()] = mainMenu;
-
-    // Set it as the current screen
-    currentScreen = mainMenu;
+    // Create a shared pointer toward the Main Screen instance
+    currentScreen = std::make_shared<MainScreen>(MainScreen::getInstance());
     renderConsole();
 }
 
@@ -24,9 +16,9 @@ ConsoleManager::ConsoleManager() {
 ///
 /// Uses a function-local static to ensure thread-safe initialization on first
 /// call.
-ConsoleManager* ConsoleManager::getInstance() {
+ConsoleManager& ConsoleManager::getInstance() {
     static ConsoleManager instance;
-    return &instance;
+    return instance;
 }
 
 /// Switches the active console if the given process name exists.
@@ -34,7 +26,10 @@ ConsoleManager* ConsoleManager::getInstance() {
 /// Logs an error message if the screen name is not found.
 void ConsoleManager::switchConsole(const std::string& processName) {
     if (processes.contains(processName)) {
-        currentScreen = processes[processName];
+        // TODO: Uncomment once ProcessScreen is done
+        // currentScreen =
+        // std::make_shared<ProcessScreen>(processes[processName]);
+        currentScreen->render();
     } else {
         std::print("No process named {} was found.", processName);
     }
@@ -58,21 +53,19 @@ void ConsoleManager::clearConsole() {
 #endif
 }
 
+void ConsoleManager::returnToMainScreen() {
+    currentScreen = std::make_shared<MainScreen>(MainScreen::getInstance());
+}
+
 /// Renders the currently active screen.
 ///
-/// @todo Call the screen’s actual render function once the Screen interface is
-/// defined.
 void ConsoleManager::renderConsole() {
-    // TODO: Call the current screen's render method here
     currentScreen->render();
 }
 
 /// Passes user input to the currently active screen for handling.
 ///
-/// @todo Call the screen’s handleInput function once the Screen interface is
-/// defined.
 void ConsoleManager::getUserInput() {
-    // TODO: Call the current screen's handleInput method here
     currentScreen->handleUserInput();
 }
 
