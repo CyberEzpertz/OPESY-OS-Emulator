@@ -26,8 +26,10 @@ ConsoleManager& ConsoleManager::getInstance() {
 /// Logs an error message if the screen name is not found.
 void ConsoleManager::switchConsole(const std::string& processName) {
     if (processes.contains(processName)) {
-        // TODO: Change the auto type here into ProcessScreen once done
-        currentScreen = std::make_shared<auto>(processes[processName]);
+        // TODO: Uncomment once ProcessScreen is done
+        // currentScreen =
+        // std::make_shared<ProcessScreen>(processes[processName]);
+        currentScreen->render();
     } else {
         std::print("No process named {} was found.", processName);
     }
@@ -58,14 +60,12 @@ void ConsoleManager::returnToMainScreen() {
 /// Renders the currently active screen.
 ///
 void ConsoleManager::renderConsole() {
-    // TODO: Call the current screen's render method here
     currentScreen->render();
 }
 
 /// Passes user input to the currently active screen for handling.
 ///
 void ConsoleManager::getUserInput() {
-    // TODO: Call the current screen's handleInput method here
     currentScreen->handleUserInput();
 }
 

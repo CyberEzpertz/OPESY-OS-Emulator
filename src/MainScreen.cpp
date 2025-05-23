@@ -57,9 +57,7 @@ void MainScreen::handleUserInput() {
 
     if (cmd == "exit") {
         ConsoleManager::getInstance().exitProgram();  // Trigger outer loop exit
-    }
-
-    else if (cmd == "clear") {
+    } else if (cmd == "clear") {
         clrScreen();
         printHeader();
     } else if (cmd == "screen" && tokens.size() >= 3) {
