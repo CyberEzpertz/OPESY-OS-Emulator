@@ -6,16 +6,20 @@
 #include <string>
 #include <vector>
 
+/// @brief Returns the singleton instance of MainScreen.
+/// @return A single shared instance of MainScreen.
 MainScreen MainScreen::getInstance() {
     static MainScreen instance;
     return instance;
 }
 
+/// @brief Renders the main screen header and starts handling user input.
 void MainScreen::render() {
     printHeader();
     handleUserInput();
 }
 
+/// @brief Main loop that processes user commands from standard input.
 void MainScreen::handleUserInput() {
     std::string input;
     while (true) {
@@ -51,10 +55,15 @@ void MainScreen::handleUserInput() {
     }
 }
 
+/// @brief Returns the name identifier of the screen.
+/// @return A string representing the screen name.
 std::string MainScreen::getName() const {
     return "MainMenu";
 }
 
+/// @brief Splits a user input string into a list of space-separated tokens.
+/// @param input The full input line.
+/// @return A vector containing individual command tokens.
 std::vector<std::string> MainScreen::splitInput(const std::string& input) {
     std::istringstream iss(input);
     std::vector<std::string> tokens;
@@ -65,14 +74,18 @@ std::vector<std::string> MainScreen::splitInput(const std::string& input) {
     return tokens;
 }
 
+/// @brief Sets the console text color using ANSI escape codes.
+/// @param color The color code to apply.
 void MainScreen::setColor(int color) {
     std::cout << "\033[" << color << "m";
 }
 
+/// @brief Resets the console text color to the default.
 void MainScreen::resetColor() {
     std::cout << "\033[0m";
 }
 
+/// @brief Clears the console screen using platform-specific commands.
 void MainScreen::clrScreen() {
 #ifdef _WIN32
     system("cls");
@@ -81,6 +94,7 @@ void MainScreen::clrScreen() {
 #endif
 }
 
+/// @brief Displays the ASCII header and instructions on the main screen.
 void MainScreen::printHeader() {
     const std::string asciiArt =
         "  ____ ____   ___  ____  _____ ______   __\n"
@@ -100,6 +114,8 @@ void MainScreen::printHeader() {
     resetColor();
 }
 
+/// @brief Prints a placeholder message for recognized commands not yet implemented.
+/// @param command The command to acknowledge.
 void MainScreen::printPlaceholder(const std::string& command) {
     std::println("'{}' command recognized. Doing something.", command);
 }
