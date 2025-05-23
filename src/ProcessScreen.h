@@ -12,7 +12,7 @@ public:
 
     void render() override;
     void handleUserInput() override;
-
+    std::string getName() const override;
 
 private:
     std::shared_ptr<Process> processPtr;

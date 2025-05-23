@@ -38,3 +38,8 @@ void ProcessScreen::handleUserInput() {
     }
 }
 
+std::string ProcessScreen::getName() const {
+    return processPtr->getName();
+}
+
+

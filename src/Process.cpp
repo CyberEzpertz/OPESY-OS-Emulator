@@ -4,6 +4,8 @@
 
 #include "Process.h"
 
+#include <utility>
+
 /**
  * @brief Constructs a new Process object with the given ID and name.
  *        Initializes currentLine to 0 and totalLines to 50.
@@ -11,8 +13,8 @@
  * @param id The unique identifier of the process.
  * @param name The name of the process.
  */
-Process::Process(int id, const std::string& name)
-    : processID(id), processName(name), currentLine(0), totalLines(50) {
+Process::Process(const int id, std::string  name)
+    : processID(id), processName(std::move(name)), currentLine(0), totalLines(50) {
     timestamp = generateTimestamp();
 }
 
@@ -28,7 +30,7 @@ int Process::getID() const {
  * @brief Gets the name of the process.
  * @return A reference to the process name.
  */
-const std::string& Process::getName() const {
+std::string Process::getName() const {
     return processName;
 }
 
@@ -36,7 +38,7 @@ const std::string& Process::getName() const {
  * @brief Retrieves the log entries associated with the process.
  * @return A reference to a vector of log strings.
  */
-const std::vector<std::string>& Process::getLogs() const {
+std::vector<std::string> Process::getLogs() const {
     return logs;
 }
 
@@ -60,7 +62,7 @@ int Process::getTotalLines() const {
  * @brief Gets the timestamp of when the process was created.
  * @return A reference to the timestamp string.
  */
-const std::string& Process::getTimestamp() const {
+std::string& Process::getTimestamp() {
     return timestamp;
 }
 

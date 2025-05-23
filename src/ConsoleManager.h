@@ -34,7 +34,7 @@ public:
 
     /// @brief Adds a new process to the manager.
     /// @param processPtr Shared pointer to the process object.
-    void addProcess(const std::shared_ptr<std::any>& processPtr);
+    void addProcess(const std::shared_ptr<Process>& processPtr);
 
     /// @brief Returns whether the program is marked for exit.
     /// @return True if the program should exit, false otherwise.

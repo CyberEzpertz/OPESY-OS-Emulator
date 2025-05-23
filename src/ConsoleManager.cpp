@@ -4,6 +4,7 @@
 
 #include "MainScreen.h"
 #include "Process.h"
+#include "ProcessScreen.h"
 
 /// Initializes a main menu screen when the singleton is created.
 ConsoleManager::ConsoleManager() {
@@ -26,9 +27,8 @@ ConsoleManager& ConsoleManager::getInstance() {
 /// Logs an error message if the screen name is not found.
 void ConsoleManager::switchConsole(const std::string& processName) {
     if (processes.contains(processName)) {
-        // TODO: Uncomment once ProcessScreen is done
-        // currentScreen =
-        // std::make_shared<ProcessScreen>(processes[processName]);
+        currentScreen = std::make_shared<ProcessScreen>(processes[processName]);
+        clearConsole();
         currentScreen->render();
     } else {
         std::print("No process named {} was found.", processName);
@@ -36,10 +36,9 @@ void ConsoleManager::switchConsole(const std::string& processName) {
 }
 
 /// Registers a process using its name for future switching.
-void ConsoleManager::addProcess(const std::shared_ptr<std::any>& processPtr) {
-    // TODO: Uncomment this once process has been implemented.
-    // std::string processName = processPtr->getName();
-    // processes[processName] = processPtr;
+void ConsoleManager::addProcess(const std::shared_ptr<Process>& processPtr) {
+     std::string processName = processPtr->getName();
+     processes[processName] = processPtr;
 }
 
 /// Clears the terminal output using platform-specific commands.
@@ -55,6 +54,8 @@ void ConsoleManager::clearConsole() {
 
 void ConsoleManager::returnToMainScreen() {
     currentScreen = std::make_shared<MainScreen>(MainScreen::getInstance());
+    clearConsole();
+    renderConsole();
 }
 
 /// Renders the currently active screen.

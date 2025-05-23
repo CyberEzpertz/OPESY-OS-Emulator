@@ -9,6 +9,8 @@ add_executable(os_emulator src/main.cpp
         src/Screen.h
         src/MainScreen.h
         src/MainScreen.cpp
+        src/ProcessScreen.h
+        src/ProcessScreen.cpp
 )
 
 set_property(TARGET os_emulator PROPERTY CXX_STANDARD 23)
