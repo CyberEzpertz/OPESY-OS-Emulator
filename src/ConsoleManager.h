@@ -25,7 +25,7 @@ public:
 
     /// @brief Retrieves the singleton instance of ConsoleManager.
     /// @return Pointer to the ConsoleManager instance.
-    static ConsoleManager* getInstance();
+    static const ConsoleManager& getInstance();
 
     /// @brief Switches the active screen to the given screen name.
     /// @param processName The name of the screen to switch to.

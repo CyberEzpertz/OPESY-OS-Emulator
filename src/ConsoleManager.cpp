@@ -1,16 +1,17 @@
 #include "ConsoleManager.h"
-#include "MainScreen.h"
-#include "Process.h"
 
 #include <print>
 
+#include "MainScreen.h"
+#include "Process.h"
 
 /// Initializes a main menu screen when the singleton is created.
 /// @todo Once Main Menu Screen is done, uncomment this and implement it
 /// properly.
 ConsoleManager::ConsoleManager() {
     // Create the main menu screen
-    const auto mainMenu = std::make_shared<MainScreen>(MainScreen::getInstance());
+    const auto mainMenu =
+        std::make_shared<MainScreen>(MainScreen::getInstance());
 
     // Add it to available screens by its name
     // availableScreens[mainMenu->getName()] = mainMenu;
@@ -24,9 +25,9 @@ ConsoleManager::ConsoleManager() {
 ///
 /// Uses a function-local static to ensure thread-safe initialization on first
 /// call.
-ConsoleManager* ConsoleManager::getInstance() {
+const ConsoleManager& ConsoleManager::getInstance() {
     static ConsoleManager instance;
-    return &instance;
+    return instance;
 }
 
 /// Switches the active console if the given process name exists.

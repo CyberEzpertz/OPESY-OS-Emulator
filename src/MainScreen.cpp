@@ -10,7 +10,7 @@
 
 /// @brief Returns the singleton instance of MainScreen.
 /// @return A single shared instance of MainScreen.
-MainScreen MainScreen::getInstance() {
+const MainScreen& MainScreen::getInstance() {
     static MainScreen instance;
     return instance;
 }
@@ -24,14 +24,16 @@ void MainScreen::render() {
 /// @brief Processes a single user command from standard input.
 ///
 /// Reads a line of input, normalizes whitespace, and parses it into tokens.
-/// Executes commands like 'exit', 'clear', 'screen' options, and predefined commands.
+/// Executes commands like 'exit', 'clear', 'screen' options, and predefined
+/// commands.
 ///
 /// Recognized commands:
 /// - "exit": Signals the ConsoleManager to exit the program loop.
 /// - "clear": Clears the console screen and prints the header.
 /// - "screen -s <name>": Placeholder for creating a new screen.
 /// - "screen -r <name>": Placeholder for resuming a screen.
-/// - "scheduler-test", "scheduler-stop", "report-util", "initialize": Placeholders for other commands.
+/// - "scheduler-test", "scheduler-stop", "report-util", "initialize":
+/// Placeholders for other commands.
 ///
 /// If the command is unrecognized, prints an error message.
 ///
@@ -48,12 +50,14 @@ void MainScreen::handleUserInput() {
         tokens.push_back(word);
     }
 
-    if (tokens.empty()) return;
+    if (tokens.empty())
+        return;
 
     const std::string& cmd = tokens[0];
 
     if (cmd == "exit") {
-        ConsoleManager::getInstance()->exitProgram();  // Trigger outer loop exit
+        ConsoleManager::getInstance()
+            ->exitProgram();  // Trigger outer loop exit
     }
 
     else if (cmd == "clear") {
@@ -71,7 +75,7 @@ void MainScreen::handleUserInput() {
                cmd == "report-util" || cmd == "initialize") {
         printPlaceholder(cmd);
     } else {
-       std::cout << "Unknown command: " << input << std::endl;
+        std::cout << "Unknown command: " << input << std::endl;
     }
 }
 
@@ -134,7 +138,8 @@ void MainScreen::printHeader() {
     resetColor();
 }
 
-/// @brief Prints a placeholder message for recognized commands not yet implemented.
+/// @brief Prints a placeholder message for recognized commands not yet
+/// implemented.
 /// @param command The command to acknowledge.
 void MainScreen::printPlaceholder(const std::string& command) {
     std::println("'{}' command recognized. Doing something.", command);
