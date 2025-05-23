@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+#include "ConsoleManager.h"
+
 /// @brief Returns the singleton instance of MainScreen.
 /// @return A single shared instance of MainScreen.
 MainScreen MainScreen::getInstance() {
@@ -18,40 +20,58 @@ void MainScreen::render() {
     printHeader();
     handleUserInput();
 }
-
-/// @brief Main loop that processes user commands from standard input.
+///
+/// @brief Processes a single user command from standard input.
+///
+/// Reads a line of input, normalizes whitespace, and parses it into tokens.
+/// Executes commands like 'exit', 'clear', 'screen' options, and predefined commands.
+///
+/// Recognized commands:
+/// - "exit": Signals the ConsoleManager to exit the program loop.
+/// - "clear": Clears the console screen and prints the header.
+/// - "screen -s <name>": Placeholder for creating a new screen.
+/// - "screen -r <name>": Placeholder for resuming a screen.
+/// - "scheduler-test", "scheduler-stop", "report-util", "initialize": Placeholders for other commands.
+///
+/// If the command is unrecognized, prints an error message.
+///
 void MainScreen::handleUserInput() {
     std::string input;
-    while (true) {
-        std::print("Enter a command: ");
-        std::getline(std::cin, input);
+    std::print("Enter a command: ");
+    std::getline(std::cin, input);
 
-        if (input == "exit") {
-            break;
-        }
+    // Normalize whitespace (collapse multiple spaces)
+    std::istringstream iss(input);
+    std::string word;
+    std::vector<std::string> tokens;
+    while (iss >> word) {
+        tokens.push_back(word);
+    }
 
-        if (input == "clear") {
-            clrScreen();
-            printHeader();
+    if (tokens.empty()) return;
+
+    const std::string& cmd = tokens[0];
+
+    if (cmd == "exit") {
+        ConsoleManager::getInstance()->exitProgram();  // Trigger outer loop exit
+    }
+
+    else if (cmd == "clear") {
+        clrScreen();
+        printHeader();
+    } else if (cmd == "screen" && tokens.size() >= 3) {
+        if (tokens[1] == "-s") {
+            printPlaceholder("Create screen: " + tokens[2]);
+        } else if (tokens[1] == "-r") {
+            printPlaceholder("Resume screen: " + tokens[2]);
         } else {
-            std::vector<std::string> tokens = splitInput(input);
-            if (!tokens.empty()) {
-                const std::string& cmd = tokens[0];
-
-                if (cmd == "screen" && tokens.size() >= 3 && tokens[1] == "-s") {
-                    printPlaceholder("Create screen: " + tokens[2]);
-                    // TODO: Create & store new process, switch to process screen
-                } else if (cmd == "screen" && tokens.size() >= 3 && tokens[1] == "-r") {
-                    printPlaceholder("Resume screen: " + tokens[2]);
-                    // TODO: Resume screen if exists
-                } else if (cmd == "scheduler-test" || cmd == "scheduler-stop" ||
-                           cmd == "report-util" || cmd == "initialize") {
-                    printPlaceholder(cmd);
-                } else {
-                    std::cout << "Unknown command: " << input << std::endl;
-                }
-            }
+            std::cout << "Invalid screen option: " << tokens[1] << std::endl;
         }
+    } else if (cmd == "scheduler-test" || cmd == "scheduler-stop" ||
+               cmd == "report-util" || cmd == "initialize") {
+        printPlaceholder(cmd);
+    } else {
+       std::cout << "Unknown command: " << input << std::endl;
     }
 }
 
