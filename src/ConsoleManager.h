@@ -5,6 +5,7 @@
 #include <string>
 #include <unordered_map>
 
+#include "Process.h"
 #include "Screen.h"
 
 /// @class ConsoleManager
@@ -48,6 +49,8 @@ public:
     /// @brief Signals the program to exit.
     void exitProgram();
 
+    void returnToMainScreen();
+
 private:
     /// @brief Flag to indicate if the program should exit.
     bool hasExited = false;
@@ -65,14 +68,8 @@ private:
     void renderConsole();
 
     /// @brief The currently active screen.
-    ///
-    /// @note This should be changed to a pointer to a `Screen` class once it's
-    /// created.
     std::shared_ptr<Screen> currentScreen;
 
     /// @brief Map of available processes identified by name.
-    ///
-    /// @note Process pointers are stored as `std::any` for now, but should be
-    /// changed to the appropriate process type once it's implemented.
-    std::unordered_map<std::string, std::shared_ptr<Screen>> processes;
+    std::unordered_map<std::string, std::shared_ptr<Process>> processes;
 };
