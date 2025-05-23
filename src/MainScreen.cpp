@@ -1,16 +1,14 @@
 #include "MainScreen.h"
 
 #include <iostream>
-#include <string>
-#include <sstream>
-#include <vector>
 #include <print>
+#include <sstream>
+#include <string>
+#include <vector>
 
-MainScreen::MainScreen() = default;
-
-MainScreen* MainScreen::getInstance() {
+MainScreen MainScreen::getInstance() {
     static MainScreen instance;
-    return &instance;
+    return instance;
 }
 
 void MainScreen::render() {

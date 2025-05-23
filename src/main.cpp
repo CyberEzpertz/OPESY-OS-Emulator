@@ -8,8 +8,6 @@
 
 int main() {
     auto* console = ConsoleManager::getInstance();
-    auto* mainScreen = MainScreen::getInstance();
-    mainScreen->render();
 
     while (!console->getHasExited()) {
         console->getUserInput();

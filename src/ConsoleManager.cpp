@@ -1,5 +1,6 @@
 #include "ConsoleManager.h"
 #include "MainScreen.h"
+#include "Process.h"
 
 #include <print>
 
@@ -9,14 +10,14 @@
 /// properly.
 ConsoleManager::ConsoleManager() {
     // Create the main menu screen
-    auto mainMenu = std::make_shared<MainScreen>();
+    const auto mainMenu = std::make_shared<MainScreen>(MainScreen::getInstance());
 
     // Add it to available screens by its name
-    availableScreens[mainMenu->getName()] = mainMenu;
+    // availableScreens[mainMenu->getName()] = mainMenu;
 
     // Set it as the current screen
-    currScreen = mainMenu;
-    renderCurrScreen();
+    currentScreen = mainMenu;
+    renderConsole();
 }
 
 /// Returns a pointer to the lazily-initialized singleton instance.
