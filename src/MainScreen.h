@@ -30,10 +30,6 @@ public:
     /// actions.
     void handleUserInput() override;
 
-    /// @brief Returns the name identifier of this screen.
-    /// @return A string representing the screen name.
-    [[nodiscard]] std::string getName() const override;
-
 private:
     /// @brief Private constructor to enforce singleton pattern.
     MainScreen() = default;

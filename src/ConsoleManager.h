@@ -21,6 +21,10 @@ public:
     /// @brief Deleted copy constructor to enforce singleton pattern.
     ConsoleManager(ConsoleManager&) = delete;
 
+    /// @brief Initializes the program with the provided configs
+    /// and instantiates the MainScreen.
+    void initialize();
+
     /// @brief Deleted copy assignment operator to enforce singleton pattern.
     void operator=(ConsoleManager const&) = delete;
 
@@ -33,17 +37,15 @@ public:
     void switchConsole(const std::string& processName);
 
     /// @brief Adds a new process to the manager.
-    /// @param processPtr Shared pointer to the process object.
-    void addProcess(const std::shared_ptr<Process>& processPtr);
+    /// @param processName the name of the process to be created.
+    /// @return True if the creation was successful, false otehrwise.
+    bool createProcess(const std::string& processName);
 
     /// @brief Returns whether the program is marked for exit.
     /// @return True if the program should exit, false otherwise.
     bool getHasExited() const;
 
     /// @brief Gets user input for the currently active screen.
-    ///
-    /// @note This function should call the `handleInput` method of the current
-    /// screen once the screen interface is defined.
     void getUserInput();
 
     /// @brief Signals the program to exit.
@@ -56,7 +58,7 @@ private:
     bool hasExited = false;
 
     /// @brief Private constructor to enforce singleton pattern.
-    ConsoleManager();
+    ConsoleManager() = default;
 
     /// @brief Clears the console screen using platform-specific commands.
     static void clearConsole();
@@ -65,7 +67,7 @@ private:
     ///
     /// @note This function should call the `render` method of the current
     /// screen once the screen interface is defined.
-    void renderConsole();
+    void renderConsole() const;
 
     /// @brief The currently active screen.
     std::shared_ptr<Screen> currentScreen;
