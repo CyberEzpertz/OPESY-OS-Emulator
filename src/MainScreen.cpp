@@ -17,8 +17,22 @@ MainScreen& MainScreen::getInstance() {
 
 /// @brief Renders the main screen header and starts handling user input.
 void MainScreen::render() {
-    printHeader();
-    handleUserInput();
+    const std::string asciiArt =
+        "  ____ ____   ___  ____  _____ ______   __\n"
+        " / ___/ ___| / _ \\|  _ \\| ____/ ___\\ \\ / /\n"
+        "| |   \\___ \\| | | | |_) |  _| \\___ \\\\ V / \n"
+        "| |___ ___) | |_| |  __/| |___ ___) || |  \n"
+        " \\____|____/ \\___/|_|   |_____|____/ |_|  \n";
+
+    std::print("{}", asciiArt);
+
+    setColor(36);
+    std::println("Hello, Welcome to the CSOPESY commandline!");
+    resetColor();
+
+    setColor(33);
+    std::println("Type 'exit' to quit, 'clear' to clear the screen");
+    resetColor();
 }
 ///
 /// @brief Processes a single user command from standard input.
@@ -59,8 +73,8 @@ void MainScreen::handleUserInput() {
     if (cmd == "exit") {
         console.exitProgram();  // Trigger outer loop exit
     } else if (cmd == "clear") {
-        clrScreen();
-        printHeader();
+        console.clearConsole();
+        render();
     } else if (cmd == "screen") {
         if (tokens.size() < 3) {
             std::println("Not enough arguments for screen command.");
@@ -90,35 +104,6 @@ void MainScreen::setColor(int color) {
 /// @brief Resets the console text color to the default.
 void MainScreen::resetColor() {
     std::print("\033[0m");
-}
-
-/// @brief Clears the console screen using platform-specific commands.
-void MainScreen::clrScreen() {
-#ifdef _WIN32
-    system("cls");
-#else
-    std::print("\033[2J\033[1;1H");
-#endif
-}
-
-/// @brief Displays the ASCII header and instructions on the main screen.
-void MainScreen::printHeader() {
-    const std::string asciiArt =
-        "  ____ ____   ___  ____  _____ ______   __\n"
-        " / ___/ ___| / _ \\|  _ \\| ____/ ___\\ \\ / /\n"
-        "| |   \\___ \\| | | | |_) |  _| \\___ \\\\ V / \n"
-        "| |___ ___) | |_| |  __/| |___ ___) || |  \n"
-        " \\____|____/ \\___/|_|   |_____|____/ |_|  \n";
-
-    std::print("{}", asciiArt);
-
-    setColor(36);
-    std::println("Hello, Welcome to the CSOPESY commandline!");
-    resetColor();
-
-    setColor(33);
-    std::println("Type 'exit' to quit, 'clear' to clear the screen");
-    resetColor();
 }
 
 /// @brief Prints a placeholder message for recognized commands not yet

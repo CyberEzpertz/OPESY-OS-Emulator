@@ -31,7 +31,7 @@ void ConsoleManager::switchConsole(const std::string& processName) {
         clearConsole();
         currentScreen->render();
     } else {
-        std::print("No process named {} was found.", processName);
+        std::println("Error: No process named {} was found.", processName);
     }
 }
 

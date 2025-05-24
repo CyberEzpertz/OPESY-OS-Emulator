@@ -41,12 +41,6 @@ private:
     /// @brief Resets the console text color to default.
     static void resetColor();
 
-    /// @brief Clears the console screen.
-    static void clrScreen();
-
-    /// @brief Prints the header for the main menu.
-    static void printHeader();
-
     /// @brief Displays a placeholder message for unimplemented commands.
     /// @param command The command entered by the user.
     static void printPlaceholder(const std::string& command);

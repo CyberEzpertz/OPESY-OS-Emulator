@@ -45,6 +45,9 @@ public:
     /// @return True if the program should exit, false otherwise.
     bool getHasExited() const;
 
+    /// @brief Clears the console screen using platform-specific commands.
+    static void clearConsole();
+
     /// @brief Gets user input for the currently active screen.
     void getUserInput();
 
@@ -59,9 +62,6 @@ private:
 
     /// @brief Private constructor to enforce singleton pattern.
     ConsoleManager() = default;
-
-    /// @brief Clears the console screen using platform-specific commands.
-    static void clearConsole();
 
     /// @brief Renders the currently active screen.
     ///
