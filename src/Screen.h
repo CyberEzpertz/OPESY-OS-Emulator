@@ -20,9 +20,6 @@ public:
     /// @brief Handle user input on the screen
     virtual void handleUserInput() = 0;
 
-    /// @brief Get the name of the screen
-    [[nodiscard]] virtual std::string getName() const = 0;
-
 protected:
     /// @brief Splits a user input string into a list of space-separated tokens.
     /// @param input The full input line.

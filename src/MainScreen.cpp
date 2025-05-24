@@ -60,39 +60,35 @@ void MainScreen::handleUserInput() {
     } else if (cmd == "clear") {
         clrScreen();
         printHeader();
-    } else if (cmd == "screen" && tokens.size() >= 3) {
-        if (tokens[1] == "-s") {
-            auto newProcess = std::make_shared<Process>(1,tokens[2]);
+    } else if (cmd == "screen") {
+        if (tokens.size() < 3) {
+            std::println("Not enough arguments for screen command.");
+        } else if (tokens[1] == "-s") {
+            auto newProcess = std::make_shared<Process>(1, tokens[2]);
             ConsoleManager::getInstance().addProcess(newProcess);
             ConsoleManager::getInstance().switchConsole(tokens[2]);
         } else if (tokens[1] == "-r") {
             ConsoleManager::getInstance().switchConsole(tokens[2]);
         } else {
-            std::cout << "Invalid screen option: " << tokens[1] << std::endl;
+            std::println("Invalid screen flag: {}", tokens[1]);
         }
     } else if (cmd == "scheduler-test" || cmd == "scheduler-stop" ||
                cmd == "report-util" || cmd == "initialize") {
         printPlaceholder(cmd);
     } else {
-        std::cout << "Unknown command: " << input << std::endl;
+        std::println("Unknown command: {}", cmd);
     }
-}
-
-/// @brief Returns the name identifier of the screen.
-/// @return A string representing the screen name.
-std::string MainScreen::getName() const {
-    return "MainMenu";
 }
 
 /// @brief Sets the console text color using ANSI escape codes.
 /// @param color The color code to apply.
 void MainScreen::setColor(int color) {
-    std::cout << "\033[" << color << "m";
+    std::print("\033[{}m", color);
 }
 
 /// @brief Resets the console text color to the default.
 void MainScreen::resetColor() {
-    std::cout << "\033[0m";
+    std::print("\033[0m");
 }
 
 /// @brief Clears the console screen using platform-specific commands.
@@ -100,7 +96,7 @@ void MainScreen::clrScreen() {
 #ifdef _WIN32
     system("cls");
 #else
-    std::cout << "\033[2J\033[1;1H";
+    std::print("\033[2J\033[1;1H");
 #endif
 }
 
