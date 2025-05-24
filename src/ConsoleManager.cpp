@@ -6,9 +6,9 @@
 #include "Process.h"
 #include "ProcessScreen.h"
 
-/// Initializes a main menu screen when the singleton is created.
-ConsoleManager::ConsoleManager() {
-    // Create a shared pointer toward the Main Screen instance
+/// Initializes the console manager with the main screen and renders it.
+/// TODO: Will read the config file and use the parameters there in the future.
+void ConsoleManager::initialize() {
     currentScreen = std::make_shared<MainScreen>(MainScreen::getInstance());
     renderConsole();
 }
@@ -35,10 +35,20 @@ void ConsoleManager::switchConsole(const std::string& processName) {
     }
 }
 
-/// Registers a process using its name for future switching.
-void ConsoleManager::addProcess(const std::shared_ptr<Process>& processPtr) {
-     std::string processName = processPtr->getName();
-     processes[processName] = processPtr;
+/// Creates and registers a process using its name for future switching.
+/// Returns true if creation was successful, false if not.
+bool ConsoleManager::createProcess(const std::string& processName) {
+    // Don't allow duplicate process names because we use that to access them
+    if (processes.contains(processName)) {
+        std::println("Error: Process '{}' already exists.", processName);
+        return false;
+    }
+
+    const int PID = processes.size() + 1;
+    auto newProcess = std::make_shared<Process>(PID, processName);
+    processes[processName] = newProcess;
+
+    return true;
 }
 
 /// Clears the terminal output using platform-specific commands.
@@ -59,13 +69,11 @@ void ConsoleManager::returnToMainScreen() {
 }
 
 /// Renders the currently active screen.
-///
-void ConsoleManager::renderConsole() {
+void ConsoleManager::renderConsole() const {
     currentScreen->render();
 }
 
 /// Passes user input to the currently active screen for handling.
-///
 void ConsoleManager::getUserInput() {
     currentScreen->handleUserInput();
 }

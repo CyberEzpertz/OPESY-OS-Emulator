@@ -54,9 +54,10 @@ void MainScreen::handleUserInput() {
         return;
 
     const std::string& cmd = tokens[0];
+    ConsoleManager& console = ConsoleManager::getInstance();
 
     if (cmd == "exit") {
-        ConsoleManager::getInstance().exitProgram();  // Trigger outer loop exit
+        console.exitProgram();  // Trigger outer loop exit
     } else if (cmd == "clear") {
         clrScreen();
         printHeader();
@@ -64,11 +65,11 @@ void MainScreen::handleUserInput() {
         if (tokens.size() < 3) {
             std::println("Not enough arguments for screen command.");
         } else if (tokens[1] == "-s") {
-            auto newProcess = std::make_shared<Process>(1, tokens[2]);
-            ConsoleManager::getInstance().addProcess(newProcess);
-            ConsoleManager::getInstance().switchConsole(tokens[2]);
+            const bool success = console.createProcess(tokens[2]);
+            if (success)
+                console.switchConsole(tokens[2]);
         } else if (tokens[1] == "-r") {
-            ConsoleManager::getInstance().switchConsole(tokens[2]);
+            console.switchConsole(tokens[2]);
         } else {
             std::println("Invalid screen flag: {}", tokens[1]);
         }
