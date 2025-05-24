@@ -5,10 +5,21 @@
 #include <iostream>
 #include <print>
 
+/// @brief Constructs a ProcessScreen with a specific process instance.
+///
+/// Initializes the internal processPtr with the given shared pointer to a Process.
+/// This screen will display and interact with the provided process.
+///
+/// @param process A shared pointer to the process to display and control.
 ProcessScreen::ProcessScreen(std::shared_ptr<Process> process)
     : processPtr(std::move(process)) {
 }
 
+/// @brief Renders detailed information about the current process.
+///
+/// Displays the process's ID, name, timestamp, current instruction progress,
+/// and a list of logged messages. Also displays navigation instructions
+/// for the user.
 void ProcessScreen::render() {
     std::println("\033[35m=== Process Information ===\033[0m");
     std::println("ID: {}", processPtr->getID());
@@ -25,6 +36,12 @@ void ProcessScreen::render() {
                  "to refresh.\033[0m");
 }
 
+/// @brief Handles user input specific to the ProcessScreen context.
+///
+/// Recognized commands:
+/// - "process-smi": Refreshes the screen by re-rendering the current process info.
+/// - "exit": Returns to the main screen.
+/// - Any other command results in an error message.
 void ProcessScreen::handleUserInput() {
     std::string input;
     std::print("[Process] Enter command: ");
