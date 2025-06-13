@@ -13,6 +13,7 @@ add_executable(os_emulator src/main.cpp
         src/ProcessScreen.cpp
         src/ProcessScheduler.cpp
         src/ProcessScheduler.h
+        src/Instruction.h
 )
 
 set_property(TARGET os_emulator PROPERTY CXX_STANDARD 23)
