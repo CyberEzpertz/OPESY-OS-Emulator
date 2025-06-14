@@ -95,7 +95,7 @@ void ProcessScheduler::incrementCpuCycles() {
 
 void ProcessScheduler::tickLoop() {
     while (running) {
-        std::this_thread::sleep_for(50ms);  // Simulate one tick every 50ms
+        std::this_thread::sleep_for(10ms);  // Simulate one tick every 50ms
         incrementCpuCycles();
     }
 }

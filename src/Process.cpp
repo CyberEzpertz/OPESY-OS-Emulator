@@ -79,7 +79,7 @@ void Process::log(const std::string& entry) {
  */
 void Process::incrementLine() {
     if (currentLine < totalLines) {
-        // instructions[currentLine].execute();
+        instructions[currentLine]->execute();
 
         currentLine++;
         if (currentLine >= totalLines) {

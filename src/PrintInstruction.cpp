@@ -10,12 +10,12 @@ PrintInstruction::PrintInstruction(const std::string& msg,
 }
 
 void PrintInstruction::execute() {
-    std::string printMessage =
+    std::string logMessage =
         "(" + process->getTimestamp() + ")" +
         " Core:" + std::to_string(process->getCurrentCore()) + " \"" + message +
         "\"";
 
-    process->getLogs().emplace_back(std::move(printMessage));
+    process->log(logMessage);
 }
 
 const std::string& PrintInstruction::getMessage() const noexcept {

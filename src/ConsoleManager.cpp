@@ -68,8 +68,9 @@ bool ConsoleManager::createDummyProcess(const std::string& processName) {
     std::vector<std::shared_ptr<Instruction>> instructions;
 
     for (int i = 0; i < 100; i++) {
-        instructions.push_back(
-            std::make_shared<PrintInstruction>("Hello", newProcess));
+        instructions.push_back(std::make_shared<PrintInstruction>(
+            std::format("Hello world from {}!", newProcess->getName()),
+            newProcess));
     }
 
     newProcess->setInstructions(instructions);
