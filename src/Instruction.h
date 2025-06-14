@@ -1,22 +1,20 @@
 #pragma once
 
-#include <string>
-#include <vector>
-#include <memory>
-#include <string_view>
 #include <concepts>
+#include <memory>
+#include <string>
+#include <string_view>
+#include <vector>
 
-class Process {
-public:
-    std::vector<std::string> logs;
-};
+#include "Process.h"
 
 class Instruction {
 protected:
     int lineCount;
+    Process* process;
 
 public:
-    explicit Instruction(int lines = 1) : lineCount(lines) {}
+    explicit Instruction(int lines = 1, const Process* process = nullptr);
 
     virtual ~Instruction() = default;
 
@@ -26,9 +24,7 @@ public:
     Instruction(Instruction&&) = default;
     Instruction& operator=(Instruction&&) = default;
 
-    virtual void execute(Process& process) = 0;
+    virtual void execute() = 0;
 
-    [[nodiscard]] constexpr int getLineCount() const noexcept {
-        return lineCount;
-    }
+    [[nodiscard]] constexpr int getLineCount() const noexcept;
 };
