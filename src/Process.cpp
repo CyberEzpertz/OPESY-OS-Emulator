@@ -97,12 +97,18 @@ void Process::incrementLine() {
     }
 }
 
+/**
+ * @brief Writes all existing log entries to a file under the ./logs directory.
+ *
+ * Each log line is assumed to already include its own timestamp and CPU core ID.
+ * The log file is named using the process name (e.g., logs/p01.txt).
+ */
 void Process::writeLogToFile() const {
     try {
-        // Ensure logs directory exists
+        // Ensure the logs directory exists
         std::filesystem::create_directories("logs");
 
-        // Prepare output file stream
+        // Build the full path: logs/<processName>.txt
         std::string filename = "logs/" + processName + ".txt";
         std::ofstream outFile(filename);
 
@@ -111,28 +117,9 @@ void Process::writeLogToFile() const {
             return;
         }
 
-        // Simulated CPU Core ID using thread ID modulus (for simulation purposes)
-        auto thread_id = std::hash<std::thread::id>{}(std::this_thread::get_id());
-        int core_id = static_cast<int>(thread_id % std::thread::hardware_concurrency());
-
-        // Get current timestamp
-        auto now = std::chrono::system_clock::now();
-        std::time_t timeNow = std::chrono::system_clock::to_time_t(now);
-        std::tm localTime;
-
-#ifdef _WIN32
-        localtime_s(&localTime, &timeNow);
-#else
-        localtime_r(&timeNow, &localTime);
-#endif
-
-        std::ostringstream timestampStream;
-        timestampStream << std::put_time(&localTime, "%m/%d/%Y, %I:%M:%S %p");
-        std::string timestamp = timestampStream.str();
-
-        // Write log entries to file
+        // Directly write each pre-formatted log line
         for (const std::string& log : logs) {
-            outFile << "(" << timestamp << ") Core: " << core_id << " \"" << log << "\"\n";
+            outFile << log << '\n';
         }
 
         outFile.close();
@@ -140,6 +127,7 @@ void Process::writeLogToFile() const {
         std::cerr << "Exception during log writing: " << e.what() << '\n';
     }
 }
+
 
 
 /**
