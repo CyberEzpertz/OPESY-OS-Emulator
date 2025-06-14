@@ -13,6 +13,7 @@ int main() {
     scheduler.initialize(4);
     console.initialize();
     console.createDummies(10);
+    scheduler.start();
 
     while (!console.getHasExited()) {
         console.getUserInput();
