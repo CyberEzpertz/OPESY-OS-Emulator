@@ -9,11 +9,9 @@
 #include <ctime>
 #include <fstream>
 #include <filesystem>
-#include <format>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
-#include <thread>
 
 /**
  * @brief Constructs a new Process object with the given ID and name.
@@ -22,8 +20,11 @@
  * @param id The unique identifier of the process.
  * @param name The name of the process.
  */
-Process::Process(const int id, std::string  name)
-    : processID(id), processName(std::move(name)), currentLine(0), totalLines(50) {
+Process::Process(const int id, std::string name)
+    : processID(id),
+      processName(std::move(name)),
+      currentLine(0),
+      totalLines(50) {
     timestamp = generateTimestamp();
 }
 
@@ -60,7 +61,8 @@ int Process::getCurrentLine() const {
 }
 
 /**
- * @brief Retrieves the total number of lines the process is expected to execute.
+ * @brief Retrieves the total number of lines the process is expected to
+ * execute.
  * @return Total line count.
  */
 int Process::getTotalLines() const {
@@ -86,15 +88,22 @@ void Process::log(const std::string& entry) {
 /**
  * @brief Increments the current line number, up to the total number of lines.
  */
-void Process::incrementLine() {
+void Process::incrementLine(int coreId) {
     if (currentLine < totalLines) {
         currentLine++;
+        if (currentLine >= totalLines) {
+            this->setStatus(DONE);
+            writeLogToFile();
+        }
     }
+}
 
-    // If done with instructions, trigger log writing
-    if (currentLine >= totalLines) {
-        writeLogToFile();
-    }
+ProcessStatus Process::getStatus() const {
+    return status;
+}
+
+void Process::setStatus(const ProcessStatus newStatus) {
+    this->status = newStatus;
 }
 
 /**
