@@ -4,6 +4,7 @@
 
 #include "MainScreen.h"
 #include "Process.h"
+#include "ProcessScheduler.h"
 #include "ProcessScreen.h"
 
 /// Initializes the console manager with the main screen and renders it.
@@ -48,6 +49,8 @@ bool ConsoleManager::createProcess(const std::string& processName) {
     auto newProcess = std::make_shared<Process>(PID, processName);
     processes[processName] = newProcess;
 
+    ProcessScheduler::getInstance().scheduleProcess(newProcess);
+
     return true;
 }
 
@@ -86,4 +89,11 @@ void ConsoleManager::exitProgram() {
 /// Returns whether the application has been marked for exit.
 bool ConsoleManager::getHasExited() const {
     return hasExited;
+}
+
+void ConsoleManager::createDummies(const int count) {
+    for (int i = 1; i <= count; ++i) {
+        std::string processName = std::format("process_{:02}", i);
+        createProcess(processName);
+    }
 }

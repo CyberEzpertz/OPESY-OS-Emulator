@@ -1,12 +1,9 @@
 #include "ProcessScheduler.h"
 
-#include <algorithm>
 #include <chrono>
-#include <fstream>
-#include <iostream>
 #include <thread>
 
-#include "Process.h"  // Assuming Process class exists
+#include "Process.h"
 
 using namespace std::chrono_literals;
 
@@ -48,31 +45,10 @@ void ProcessScheduler::start() {
 
 void ProcessScheduler::initialize(const int numCores) {
     this->numCpuCores = numCores;
-    // std::ifstream config(configPath);
-    // if (!config.is_open()) {
-    //     std::cerr << "Failed to open config file: " << configPath << "\n";
-    //     return;
-    // }
-    //
-    // std::string key;
-    // while (config >> key) {
-    //     if (key == "num-cpu") {
-    //         config >> numCpuCores;
-    //     } else if (key == "scheduler") {
-    //         std::string sched;
-    //         config >> sched;
-    //         schedulerType =
-    //             (sched == "fcfs") ? SchedulerType::FCFS : SchedulerType::RR;
-    //     } else if (key == "quantum-cycles") {
-    //         config >> quantumCycles;
-    //     }
-    //     // Add more config parameters as needed
-    // }
-    //
-    // config.close();
 }
 
-void ProcessScheduler::addProcess(const std::shared_ptr<Process>& process) {
+void ProcessScheduler::scheduleProcess(
+    const std::shared_ptr<Process>& process) {
     {
         std::lock_guard<std::mutex> lock(queueMutex);
         processQueue.push_back(process);
@@ -92,6 +68,10 @@ void ProcessScheduler::incrementCpuCycles() {
     {
         std::lock_guard<std::mutex> lock(tickMutex);
         ++cpuCycles;
+
+        if (processQueue.empty()) {
+            running = false;
+        }
     }
     tickCv.notify_all();  // Notify all worker threads that a new tick occurred
 }
@@ -118,6 +98,7 @@ void ProcessScheduler::workerLoop(int coreId) {
             }
         }
 
+        // NOTE: This is only for FCFS, RR will be implemented in the future
         while (proc && proc->getStatus() != DONE) {
             // Wait for next tick before executing next instruction
             {

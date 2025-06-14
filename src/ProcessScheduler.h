@@ -19,7 +19,7 @@ public:
 
     void start();
     void initialize(int numCores);  // TODO
-    void addProcess(const std::shared_ptr<Process>& process);
+    void scheduleProcess(const std::shared_ptr<Process>& process);
     void sortQueue();  // FCFS only
     uint64_t getCurrentCycle() const;
 
