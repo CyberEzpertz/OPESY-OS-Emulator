@@ -85,6 +85,10 @@ void ConsoleManager::getUserInput() {
 void ConsoleManager::exitProgram() {
     hasExited = true;
 }
+std::unordered_map<std::string, std::shared_ptr<Process>>
+ConsoleManager::getProcesses() {
+    return processes;
+}
 
 /// Returns whether the application has been marked for exit.
 bool ConsoleManager::getHasExited() const {
