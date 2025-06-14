@@ -80,9 +80,9 @@ void ProcessScheduler::incrementCpuCycles() {
         std::lock_guard<std::mutex> lock(tickMutex);
         ++cpuCycles;
 
-        if (processQueue.empty() && availableCores.load() == numCpuCores) {
-            running = false;
-        }
+        // if (processQueue.empty() && availableCores.load() == numCpuCores) {
+        //     running = false;
+        // }
     }
     tickCv.notify_all();  // Notify all worker threads that a new tick occurred
 }
