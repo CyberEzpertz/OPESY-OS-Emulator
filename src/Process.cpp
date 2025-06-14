@@ -4,14 +4,14 @@
 
 #include "Process.h"
 
-#include <utility>
 #include <chrono>
 #include <ctime>
-#include <fstream>
 #include <filesystem>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
+#include <utility>
 
 /**
  * @brief Constructs a new Process object with the given ID and name.
@@ -88,11 +88,11 @@ void Process::log(const std::string& entry) {
 /**
  * @brief Increments the current line number, up to the total number of lines.
  */
-void Process::incrementLine(int coreId) {
+void Process::incrementLine() {
     if (currentLine < totalLines) {
         currentLine++;
         if (currentLine >= totalLines) {
-            this->setStatus(DONE);
+            this->status = DONE;
             writeLogToFile();
         }
     }
@@ -106,11 +106,18 @@ void Process::setStatus(const ProcessStatus newStatus) {
     this->status = newStatus;
 }
 
+void Process::setCurrentCore(int coreId) {
+    currentCore = coreId;
+}
+int Process::getCurrentCore() const {
+    return currentCore.load();
+}
+
 /**
  * @brief Writes all existing log entries to a file under the ./logs directory.
  *
- * Each log line is assumed to already include its own timestamp and CPU core ID.
- * The log file is named using the process name (e.g., logs/p01.txt).
+ * Each log line is assumed to already include its own timestamp and CPU core
+ * ID. The log file is named using the process name (e.g., logs/p01.txt).
  */
 void Process::writeLogToFile() const {
     try {
@@ -122,7 +129,8 @@ void Process::writeLogToFile() const {
         std::ofstream outFile(filename);
 
         if (!outFile.is_open()) {
-            std::cerr << "Error: Could not open log file for process " << processName << "\n";
+            std::cerr << "Error: Could not open log file for process "
+                      << processName << "\n";
             return;
         }
 
@@ -137,10 +145,9 @@ void Process::writeLogToFile() const {
     }
 }
 
-
-
 /**
- * @brief Generates a formatted timestamp string representing the current local time.
+ * @brief Generates a formatted timestamp string representing the current local
+ * time.
  * @return A string formatted as MM/DD/YYYY, HH:MM:SS AM/PM.
  */
 std::string Process::generateTimestamp() const {

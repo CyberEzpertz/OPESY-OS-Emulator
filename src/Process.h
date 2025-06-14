@@ -4,10 +4,7 @@
 
 #pragma once
 
-#include <chrono>
-#include <ctime>
-#include <iomanip>
-#include <sstream>
+#include <atomic>
 #include <string>
 #include <vector>
 
@@ -73,7 +70,7 @@ public:
      * @brief Increments the current line number by 1, up to the total number of
      * lines.
      */
-    void incrementLine(int coreId);
+    void incrementLine();
 
     [[nodiscard]] ProcessStatus getStatus() const;
     void setStatus(ProcessStatus newStatus);
@@ -82,6 +79,8 @@ public:
     ///        Each line includes a timestamp and CPU core ID.
     void writeLogToFile() const;
 
+    void setCurrentCore(int coreId);
+    int getCurrentCore() const;
 
 private:
     int processID;                  ///< Unique identifier for the process.
@@ -91,6 +90,7 @@ private:
     int totalLines;         ///< Total lines of code the process will execute.
     std::string timestamp;  ///< Timestamp when the process was created.
     ProcessStatus status;
+    std::atomic<int> currentCore = -1;
 
     /**
      * @brief Generates a formatted timestamp for the process creation time.

@@ -43,8 +43,17 @@ void ProcessScheduler::start() {
     tickThread = std::thread(&ProcessScheduler::tickLoop, this);
 }
 
+int ProcessScheduler::getNumAvailableCores() const {
+    return availableCores.load();
+}
+
+int ProcessScheduler::getNumTotalCores() const {
+    return numCpuCores;
+}
+
 void ProcessScheduler::initialize(const int numCores) {
     this->numCpuCores = numCores;
+    this->availableCores = numCores;
 }
 
 void ProcessScheduler::scheduleProcess(
@@ -53,7 +62,9 @@ void ProcessScheduler::scheduleProcess(
         std::lock_guard<std::mutex> lock(queueMutex);
         processQueue.push_back(process);
     }
-    tickCv.notify_all();  // Wake workers in case they were waiting for work
+
+    // Wake one worker in case they were waiting for work
+    queueCv.notify_one();
 }
 
 void ProcessScheduler::sortQueue() {
@@ -69,7 +80,7 @@ void ProcessScheduler::incrementCpuCycles() {
         std::lock_guard<std::mutex> lock(tickMutex);
         ++cpuCycles;
 
-        if (processQueue.empty()) {
+        if (processQueue.empty() && availableCores.load() == numCpuCores) {
             running = false;
         }
     }
@@ -78,7 +89,7 @@ void ProcessScheduler::incrementCpuCycles() {
 
 void ProcessScheduler::tickLoop() {
     while (running) {
-        std::this_thread::sleep_for(10ms);  // Simulate one tick every 10ms
+        std::this_thread::sleep_for(50ms);  // Simulate one tick every 50ms
         incrementCpuCycles();
     }
 }
@@ -88,13 +99,20 @@ void ProcessScheduler::workerLoop(int coreId) {
     std::shared_ptr<Process> proc = nullptr;
 
     while (running) {
+        // Get a process from the queue
         {
-            std::lock_guard<std::mutex> lock(queueMutex);
+            std::unique_lock<std::mutex> lock(queueMutex);
+
+            queueCv.wait(lock,
+                         [&] { return !processQueue.empty() || !running; });
+
             if (!processQueue.empty()) {
                 proc = processQueue.front();
                 processQueue.pop_front();
 
                 proc->setStatus(RUNNING);
+                proc->setCurrentCore(coreId + 1);
+                availableCores -= 1;
             }
         }
 
@@ -105,12 +123,21 @@ void ProcessScheduler::workerLoop(int coreId) {
                 std::unique_lock<std::mutex> lock(tickMutex);
                 tickCv.wait(
                     lock, [&] { return cpuCycles > lastTickSeen || !running; });
+
                 if (!running)
                     break;
                 lastTickSeen = cpuCycles;
             }
 
-            proc->incrementLine(coreId);
+            proc->incrementLine();
+        }
+
+        // Reset current core to none
+        if (proc) {
+            proc->setCurrentCore(-1);
+            proc = nullptr;
+
+            availableCores += 1;
         }
     }
 }

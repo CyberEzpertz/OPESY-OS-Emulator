@@ -18,6 +18,8 @@ public:
     static ProcessScheduler& getInstance();
 
     void start();
+    int getNumAvailableCores() const;
+    int getNumTotalCores() const;
     void initialize(int numCores);  // TODO
     void scheduleProcess(const std::shared_ptr<Process>& process);
     void sortQueue();  // FCFS only
@@ -34,11 +36,14 @@ private:
     void workerLoop(int coreId);
     void incrementCpuCycles();
 
-    int numCpuCores = 4;
+    int numCpuCores;
+    std::atomic<int> availableCores;
+
     SchedulerType schedulerType = SchedulerType::FCFS;
     uint32_t quantumCycles = 1;
 
     std::deque<std::shared_ptr<Process>> processQueue;
+    std::condition_variable queueCv;
     std::mutex queueMutex;
 
     std::condition_variable tickCv;

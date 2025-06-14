@@ -1,12 +1,15 @@
 #include "MainScreen.h"
 
+#include <algorithm>
 #include <iostream>
 #include <print>
+#include <ranges>
 #include <sstream>
 #include <string>
 #include <vector>
 
 #include "ConsoleManager.h"
+#include "ProcessScheduler.h"
 
 /// @brief Returns the singleton instance of MainScreen.
 /// @return A single shared instance of MainScreen.
@@ -77,7 +80,11 @@ void MainScreen::handleUserInput() {
         render();
     } else if (cmd == "screen") {
         if (tokens.size() < 3) {
-            std::println("Not enough arguments for screen command.");
+            if (tokens[1] == "-ls") {
+                printProcessReport();
+            } else {
+                std::println("Not enough arguments for screen command.");
+            }
         } else if (tokens[1] == "-s") {
             const bool success = console.createProcess(tokens[2]);
             if (success)
@@ -111,4 +118,58 @@ void MainScreen::resetColor() {
 /// @param command The command to acknowledge.
 void MainScreen::printPlaceholder(const std::string& command) {
     std::println("'{}' command recognized. Doing something.", command);
+}
+
+void MainScreen::printProcessReport() {
+    ProcessScheduler& scheduler = ProcessScheduler::getInstance();
+
+    int availableCores = scheduler.getNumAvailableCores();
+    int numCores = scheduler.getNumTotalCores();
+    double cpuUtil =
+        static_cast<double>(numCores - availableCores) / numCores * 100.0;
+
+    auto processes = ConsoleManager::getInstance().getProcesses();
+
+    std::vector<std::shared_ptr<Process>> sorted;
+
+    for (const auto& proc : processes | std::views::values) {
+        sorted.push_back(proc);
+    }
+
+    std::ranges::sort(sorted, [](const auto& a, const auto& b) {
+        return a->getName() < b->getName();
+    });
+
+    std::println("CPU Utilization: {:.0f}%", cpuUtil);
+    std::println("Cores used: {}", numCores - availableCores);
+    std::println("Cores available: {}", availableCores);
+    std::println("Total Cores: {}", numCores);
+
+    std::println("{:->30}", "");
+    std::println("Running processes:");
+
+    for (const auto& process : sorted) {
+        if (process->getStatus() != DONE) {
+            std::string coreStr =
+                (process->getCurrentCore() == -1)
+                    ? "N/A"
+                    : std::to_string(process->getCurrentCore());
+
+            std::println("{:<10} ({:<8}) Core: {:<4} {:>3} / {}",
+                         process->getName(), process->getTimestamp(), coreStr,
+                         process->getCurrentLine(), process->getTotalLines());
+        }
+    }
+
+    std::println("\nFinished processes:");
+
+    for (const auto& process : sorted) {
+        if (process->getStatus() == DONE) {
+            std::println("{:<10} ({:<8}) Finished {:>3} / {}",
+                         process->getName(), process->getTimestamp(),
+                         process->getCurrentLine(), process->getTotalLines());
+        }
+    }
+
+    std::println("{:->30}", "");
 }
