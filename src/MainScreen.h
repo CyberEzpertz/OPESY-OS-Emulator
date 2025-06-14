@@ -44,4 +44,5 @@ private:
     /// @brief Displays a placeholder message for unimplemented commands.
     /// @param command The command entered by the user.
     static void printPlaceholder(const std::string& command);
+    void printProcessReport();
 };

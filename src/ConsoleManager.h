@@ -44,6 +44,7 @@ public:
     /// @brief Returns whether the program is marked for exit.
     /// @return True if the program should exit, false otherwise.
     bool getHasExited() const;
+    void createDummies(int count);
 
     /// @brief Clears the console screen using platform-specific commands.
     static void clearConsole();
@@ -53,6 +54,8 @@ public:
 
     /// @brief Signals the program to exit.
     void exitProgram();
+
+    std::unordered_map<std::string, std::shared_ptr<Process>> getProcesses();
 
     void returnToMainScreen();
 
