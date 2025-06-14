@@ -1,6 +1,9 @@
 #pragma once
 
 #include "Instruction.h"
+#include <string>
+#include <string_view>
+#include <concepts>
 
 class PrintInstruction final : public Instruction {
 private:
@@ -9,13 +12,15 @@ private:
 public:
     template<typename T>
     requires std::convertible_to<T, std::string_view>
-    explicit PrintInstruction(T&& msg) : Instruction(1), message(std::forward<T>(msg)) {}
+    explicit PrintInstruction(T&& msg);
 
-    void execute(Process& process) override {
-        process.logs.emplace_back(message);
-    }
+    void execute() override;
 
-    [[nodiscard]] const std::string& getMessage() const noexcept {
-        return message;
-    }
+    [[nodiscard]] const std::string& getMessage() const noexcept;
 };
+
+// Template implementation must be in header
+template<typename T>
+requires std::convertible_to<T, std::string_view>
+PrintInstruction::PrintInstruction(T&& msg) : Instruction(1), message(std::forward<T>(msg)) {
+}
