@@ -7,9 +7,8 @@
 #include <string>
 #include <vector>
 #include <chrono>
-#include <ctime>
-#include <iomanip>
-#include <sstream>
+
+
 
 /**
  * @class Process
@@ -70,6 +69,11 @@ public:
      * @brief Increments the current line number by 1, up to the total number of lines.
      */
     void incrementLine();
+
+    /// @brief Writes the log output to a file in the logs folder.
+    ///        Each line includes a timestamp and CPU core ID.
+    void writeLogToFile() const;
+
 
 private:
     int processID;                       ///< Unique identifier for the process.

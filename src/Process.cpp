@@ -5,6 +5,15 @@
 #include "Process.h"
 
 #include <utility>
+#include <chrono>
+#include <ctime>
+#include <fstream>
+#include <filesystem>
+#include <format>
+#include <iomanip>
+#include <iostream>
+#include <sstream>
+#include <thread>
 
 /**
  * @brief Constructs a new Process object with the given ID and name.
@@ -78,8 +87,48 @@ void Process::log(const std::string& entry) {
  * @brief Increments the current line number, up to the total number of lines.
  */
 void Process::incrementLine() {
-    if (currentLine < totalLines) currentLine++;
+    if (currentLine < totalLines) {
+        currentLine++;
+    }
+
+    // If done with instructions, trigger log writing
+    if (currentLine >= totalLines) {
+        writeLogToFile();
+    }
 }
+
+/**
+ * @brief Writes all existing log entries to a file under the ./logs directory.
+ *
+ * Each log line is assumed to already include its own timestamp and CPU core ID.
+ * The log file is named using the process name (e.g., logs/p01.txt).
+ */
+void Process::writeLogToFile() const {
+    try {
+        // Ensure the logs directory exists
+        std::filesystem::create_directories("logs");
+
+        // Build the full path: logs/<processName>.txt
+        std::string filename = "logs/" + processName + ".txt";
+        std::ofstream outFile(filename);
+
+        if (!outFile.is_open()) {
+            std::cerr << "Error: Could not open log file for process " << processName << "\n";
+            return;
+        }
+
+        // Directly write each pre-formatted log line
+        for (const std::string& log : logs) {
+            outFile << log << '\n';
+        }
+
+        outFile.close();
+    } catch (const std::exception& e) {
+        std::cerr << "Exception during log writing: " << e.what() << '\n';
+    }
+}
+
+
 
 /**
  * @brief Generates a formatted timestamp string representing the current local time.
