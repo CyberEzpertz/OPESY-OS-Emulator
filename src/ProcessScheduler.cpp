@@ -111,7 +111,7 @@ void ProcessScheduler::workerLoop(int coreId) {
                 processQueue.pop_front();
 
                 proc->setStatus(RUNNING);
-                proc->setCurrentCore(coreId + 1);
+                proc->setCurrentCore(coreId);
                 availableCores -= 1;
             }
         }

@@ -155,7 +155,7 @@ void MainScreen::printProcessReport() {
                     ? "N/A"
                     : std::to_string(process->getCurrentCore());
 
-            std::println("{:<10} ({:<8}) Core: {:<4} {:>3} / {}",
+            std::println("{:<10}\t({:<8})\tCore:\t{:<4}\t{} / {}",
                          process->getName(), process->getTimestamp(), coreStr,
                          process->getCurrentLine(), process->getTotalLines());
         }
@@ -165,7 +165,7 @@ void MainScreen::printProcessReport() {
 
     for (const auto& process : sorted) {
         if (process->getStatus() == DONE) {
-            std::println("{:<10} ({:<8}) Finished {:>3} / {}",
+            std::println("{:<10}\t({:<8})\tFinished\t{} / {}",
                          process->getName(), process->getTimestamp(),
                          process->getCurrentLine(), process->getTotalLines());
         }
