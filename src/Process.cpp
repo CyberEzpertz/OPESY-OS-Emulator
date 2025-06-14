@@ -134,6 +134,8 @@ void Process::writeLogToFile() const {
             return;
         }
 
+        outFile << "Process name: " << processName << "\n";
+        outFile << "Logs:\n\n";
         // Directly write each pre-formatted log line
         for (const std::string& log : logs) {
             outFile << log << '\n';
