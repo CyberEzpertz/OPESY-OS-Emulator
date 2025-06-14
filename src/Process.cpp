@@ -11,23 +11,12 @@
 #include <iomanip>
 #include <iostream>
 #include <sstream>
-#include <utility>
 
-/**
- * @brief Constructs a new Process object with the given ID and name.
- *        Initializes currentLine to 0 and totalLines to 50.
- *        Also generates a timestamp at the moment of creation.
- * @param id The unique identifier of the process.
- * @param name The name of the process.
- */
-Process::Process(const int id, std::string name)
-    : processID(id),
-      processName(std::move(name)),
-      currentLine(0),
-      totalLines(50) {
+Process::Process(int id, std::string name)
+    : processID(id), currentLine(0), status(READY), processName(name) {
+    totalLines = instructions.size();
     timestamp = generateTimestamp();
 }
-
 /**
  * @brief Gets the unique identifier of the process.
  * @return Process ID.
@@ -90,6 +79,8 @@ void Process::log(const std::string& entry) {
  */
 void Process::incrementLine() {
     if (currentLine < totalLines) {
+        // instructions[currentLine].execute();
+
         currentLine++;
         if (currentLine >= totalLines) {
             this->status = DONE;
@@ -111,6 +102,11 @@ void Process::setCurrentCore(int coreId) {
 }
 int Process::getCurrentCore() const {
     return currentCore.load();
+}
+void Process::setInstructions(
+    const std::vector<std::shared_ptr<Instruction>>& instructions) {
+    this->instructions = instructions;
+    this->totalLines = instructions.size();
 }
 
 /**

@@ -18,6 +18,8 @@ int main() {
     while (!console.getHasExited()) {
         console.getUserInput();
     }
+    scheduler.stop();
+    std::print("Test");
 
     return 0;
 }

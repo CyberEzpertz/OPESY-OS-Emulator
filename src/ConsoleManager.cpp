@@ -46,7 +46,34 @@ bool ConsoleManager::createProcess(const std::string& processName) {
     }
 
     const int PID = processes.size() + 1;
+
     auto newProcess = std::make_shared<Process>(PID, processName);
+    processes[processName] = newProcess;
+
+    ProcessScheduler::getInstance().scheduleProcess(newProcess);
+
+    return true;
+}
+
+bool ConsoleManager::createDummyProcess(const std::string& processName) {
+    // Don't allow duplicate process names because we use that to access them
+    if (processes.contains(processName)) {
+        std::println("Error: Process '{}' already exists.", processName);
+        return false;
+    }
+
+    const int PID = processes.size() + 1;
+
+    const auto newProcess = std::make_shared<Process>(PID, processName);
+    std::vector<std::shared_ptr<Instruction>> instructions;
+
+    for (int i = 0; i < 100; i++) {
+        instructions.push_back(
+            std::make_shared<PrintInstruction>("Hello", newProcess));
+    }
+
+    newProcess->setInstructions(instructions);
+
     processes[processName] = newProcess;
 
     ProcessScheduler::getInstance().scheduleProcess(newProcess);
@@ -98,6 +125,6 @@ bool ConsoleManager::getHasExited() const {
 void ConsoleManager::createDummies(const int count) {
     for (int i = 1; i <= count; ++i) {
         std::string processName = std::format("process_{:02}", i);
-        createProcess(processName);
+        createDummyProcess(processName);
     }
 }

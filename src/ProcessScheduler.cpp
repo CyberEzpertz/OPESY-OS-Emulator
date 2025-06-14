@@ -43,6 +43,12 @@ void ProcessScheduler::start() {
     tickThread = std::thread(&ProcessScheduler::tickLoop, this);
 }
 
+void ProcessScheduler::stop() {
+    running = false;
+    tickCv.notify_all();
+    queueCv.notify_all();
+}
+
 int ProcessScheduler::getNumAvailableCores() const {
     return availableCores.load();
 }

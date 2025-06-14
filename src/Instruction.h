@@ -1,20 +1,16 @@
 #pragma once
 
-#include <concepts>
 #include <memory>
-#include <string>
-#include <string_view>
-#include <vector>
 
-#include "Process.h"
+class Process;
 
 class Instruction {
 protected:
     int lineCount;
-    Process* process;
+    std::shared_ptr<Process> process;
 
 public:
-    explicit Instruction(int lines = 1, const Process* process = nullptr);
+    explicit Instruction(int lines, std::shared_ptr<Process> process);
 
     virtual ~Instruction() = default;
 
@@ -26,5 +22,5 @@ public:
 
     virtual void execute() = 0;
 
-    [[nodiscard]] constexpr int getLineCount() const noexcept;
+    [[nodiscard]] int getLineCount() const noexcept;
 };

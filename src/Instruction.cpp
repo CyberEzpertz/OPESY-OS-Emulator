@@ -1,7 +1,7 @@
 #include "Instruction.h"
 
-Instruction::Instruction(int lines, const Process* process) : lineCount(lines), process(const_cast<Process*>(process)) {
-    // Constructor stores the number of lines and process pointer
+Instruction::Instruction(int lines, std::shared_ptr<Process> process)
+    : lineCount(lines), process(std::move(process)) {
 }
 
 int Instruction::getLineCount() const noexcept {
