@@ -1,0 +1,135 @@
+#include "ProcessScheduler.h"
+
+#include <algorithm>
+#include <chrono>
+#include <fstream>
+#include <iostream>
+#include <thread>
+
+#include "Process.h"  // Assuming Process class exists
+
+using namespace std::chrono_literals;
+
+ProcessScheduler& ProcessScheduler::getInstance() {
+    static ProcessScheduler instance;
+    return instance;
+}
+
+ProcessScheduler::ProcessScheduler() = default;
+
+ProcessScheduler::~ProcessScheduler() {
+    running = false;
+
+    // Wake all threads
+    tickCv.notify_all();
+
+    if (tickThread.joinable()) {
+        tickThread.join();
+    }
+
+    for (auto& t : cpuWorkers) {
+        if (t.joinable()) {
+            t.join();
+        }
+    }
+}
+
+void ProcessScheduler::start() {
+    running = true;
+
+    // Start CPU worker threads
+    for (int i = 0; i < numCpuCores; ++i) {
+        cpuWorkers.emplace_back(&ProcessScheduler::workerLoop, this, i);
+    }
+
+    // Start ticking thread
+    tickThread = std::thread(&ProcessScheduler::tickLoop, this);
+}
+
+void ProcessScheduler::initialize(const int numCores) {
+    this->numCpuCores = numCores;
+    // std::ifstream config(configPath);
+    // if (!config.is_open()) {
+    //     std::cerr << "Failed to open config file: " << configPath << "\n";
+    //     return;
+    // }
+    //
+    // std::string key;
+    // while (config >> key) {
+    //     if (key == "num-cpu") {
+    //         config >> numCpuCores;
+    //     } else if (key == "scheduler") {
+    //         std::string sched;
+    //         config >> sched;
+    //         schedulerType =
+    //             (sched == "fcfs") ? SchedulerType::FCFS : SchedulerType::RR;
+    //     } else if (key == "quantum-cycles") {
+    //         config >> quantumCycles;
+    //     }
+    //     // Add more config parameters as needed
+    // }
+    //
+    // config.close();
+}
+
+void ProcessScheduler::addProcess(const std::shared_ptr<Process>& process) {
+    {
+        std::lock_guard<std::mutex> lock(queueMutex);
+        processQueue.push_back(process);
+    }
+    tickCv.notify_all();  // Wake workers in case they were waiting for work
+}
+
+void ProcessScheduler::sortQueue() {
+    // TODO: Implement this when needed
+}
+
+uint64_t ProcessScheduler::getCurrentCycle() const {
+    return cpuCycles.load();
+}
+
+void ProcessScheduler::incrementCpuCycles() {
+    {
+        std::lock_guard<std::mutex> lock(tickMutex);
+        ++cpuCycles;
+    }
+    tickCv.notify_all();  // Notify all worker threads that a new tick occurred
+}
+
+void ProcessScheduler::tickLoop() {
+    while (running) {
+        std::this_thread::sleep_for(10ms);  // Simulate one tick every 10ms
+        incrementCpuCycles();
+    }
+}
+
+void ProcessScheduler::workerLoop(int coreId) {
+    uint64_t lastTickSeen = 0;
+    std::shared_ptr<Process> proc = nullptr;
+
+    while (running) {
+        {
+            std::lock_guard<std::mutex> lock(queueMutex);
+            if (!processQueue.empty()) {
+                proc = processQueue.front();
+                processQueue.pop_front();
+
+                proc->setStatus(RUNNING);
+            }
+        }
+
+        while (proc && proc->getStatus() != DONE) {
+            // Wait for next tick before executing next instruction
+            {
+                std::unique_lock<std::mutex> lock(tickMutex);
+                tickCv.wait(
+                    lock, [&] { return cpuCycles > lastTickSeen || !running; });
+                if (!running)
+                    break;
+                lastTickSeen = cpuCycles;
+            }
+
+            proc->incrementLine(coreId);
+        }
+    }
+}
