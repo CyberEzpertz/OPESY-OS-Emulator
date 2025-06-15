@@ -43,6 +43,12 @@ void ProcessScheduler::start() {
     tickThread = std::thread(&ProcessScheduler::tickLoop, this);
 }
 
+void ProcessScheduler::stop() {
+    running = false;
+    tickCv.notify_all();
+    queueCv.notify_all();
+}
+
 int ProcessScheduler::getNumAvailableCores() const {
     return availableCores.load();
 }
@@ -89,7 +95,7 @@ void ProcessScheduler::incrementCpuCycles() {
 
 void ProcessScheduler::tickLoop() {
     while (running) {
-        std::this_thread::sleep_for(50ms);  // Simulate one tick every 50ms
+        std::this_thread::sleep_for(10ms);  // Simulate one tick every 50ms
         incrementCpuCycles();
     }
 }

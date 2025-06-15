@@ -18,6 +18,7 @@ public:
     static ProcessScheduler& getInstance();
 
     void start();
+    void stop();
     int getNumAvailableCores() const;
     int getNumTotalCores() const;
     void initialize(int numCores);  // TODO

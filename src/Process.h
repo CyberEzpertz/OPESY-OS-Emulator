@@ -8,6 +8,9 @@
 #include <string>
 #include <vector>
 
+#include "Instruction.h"
+#include "PrintInstruction.h"
+
 enum ProcessStatus { READY, RUNNING, WAITING, DONE };
 
 /**
@@ -81,6 +84,8 @@ public:
 
     void setCurrentCore(int coreId);
     int getCurrentCore() const;
+    void setInstructions(
+        const std::vector<std::shared_ptr<Instruction>>& instructions);
 
 private:
     int processID;                  ///< Unique identifier for the process.
@@ -91,6 +96,7 @@ private:
     std::string timestamp;  ///< Timestamp when the process was created.
     ProcessStatus status;
     std::atomic<int> currentCore = -1;
+    std::vector<std::shared_ptr<Instruction>> instructions;
 
     /**
      * @brief Generates a formatted timestamp for the process creation time.

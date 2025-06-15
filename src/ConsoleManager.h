@@ -40,6 +40,7 @@ public:
     /// @param processName the name of the process to be created.
     /// @return True if the creation was successful, false otehrwise.
     bool createProcess(const std::string& processName);
+    bool createDummyProcess(const std::string& processName);
 
     /// @brief Returns whether the program is marked for exit.
     /// @return True if the program should exit, false otherwise.
