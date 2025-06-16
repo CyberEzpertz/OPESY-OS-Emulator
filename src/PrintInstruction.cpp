@@ -7,7 +7,13 @@
 
 PrintInstruction::PrintInstruction(const std::string& msg,
                                    const std::shared_ptr<Process>& process)
-    : Instruction(1, process), message(msg) {
+    : Instruction(1, process), message(msg), varName("") {
+}
+
+PrintInstruction::PrintInstruction(
+    const std::string& msg,
+    const std::shared_ptr<Process>& process const std::string& varName)
+    : Instruction(1, process), message(msg), varName(varName) {
 }
 
 void PrintInstruction::execute() {
@@ -18,7 +24,7 @@ void PrintInstruction::execute() {
     const std::string logMessage =
         "(" + process->getTimestamp() + ")" +
         " Core:" + std::to_string(process->getCurrentCore()) + " \"" + message +
-        "\"";
+        varName + "\"";
 
     process->log(logMessage);
 }
