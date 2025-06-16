@@ -17,6 +17,8 @@ add_executable(os_emulator src/main.cpp
         src/PrintInstruction.h
         src/Instruction.cpp
         src/PrintInstruction.cpp
+        src/Config.cpp
+        src/Config.h
 )
 
 set_property(TARGET os_emulator PROPERTY CXX_STANDARD 23)
