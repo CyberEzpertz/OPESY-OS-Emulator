@@ -92,27 +92,57 @@ void MainScreen::handleUserInput() {
         ConsoleManager::clearConsole();
         render();
     } else if (cmd == "screen") {
-        if (tokens.size() < 3) {
-            if (tokens[1] == "-ls") {
-                printProcessReport();
-            } else {
-                std::println("Not enough arguments for screen command.");
-            }
-        } else if (tokens[1] == "-s") {
-            const bool success = console.createProcess(tokens[2]);
-            if (success)
-                console.switchConsole(tokens[2]);
-        } else if (tokens[1] == "-r") {
-            console.switchConsole(tokens[2]);
-        } else {
-            std::println("Invalid screen flag: {}", tokens[1]);
-        }
+        handleScreenCommand(tokens);
+    } else if (cmd == "initialize") {
+        std::println("Program has already been initialized.");
     } else if (cmd == "scheduler-test" || cmd == "scheduler-stop" ||
-               cmd == "report-util" || cmd == "initialize") {
+               cmd == "report-util") {
         printPlaceholder(cmd);
     } else {
-        std::println("Unknown command: {}", cmd);
+        std::println("Error: Unknown command {}", cmd);
     }
+}
+
+void MainScreen::handleScreenCommand(const std::vector<std::string>& tokens) {
+    auto& console = ConsoleManager::getInstance();
+
+    if (tokens.size() < 2) {
+        std::println("Error: Not enough arguments for screen command.");
+        return;
+    }
+
+    const std::string& flag = tokens[1];
+
+    if (flag == "-ls") {
+        if (tokens.size() > 2) {
+            std::println("Error: Too many arguments for -ls.");
+        } else {
+            printProcessReport();
+        }
+        return;
+    }
+
+    if (flag == "-s" || flag == "-r") {
+        if (tokens.size() < 3) {
+            std::println("Error: Missing process name for {} flag.", flag);
+            return;
+        }
+
+        const std::string& processName = tokens[2];
+
+        if (flag == "-s") {
+            if (console.createProcess(processName)) {
+                console.switchConsole(processName);
+            }
+        } else {  // -r
+            console.switchConsole(processName);
+        }
+
+        return;
+    }
+
+    // If the flag is not recognized
+    std::println("Invalid screen flag: {}", flag);
 }
 
 /// @brief Sets the console text color using ANSI escape codes.
