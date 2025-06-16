@@ -73,8 +73,7 @@ uint8_t getRandomSleepTime() {
 }
 
 std::vector<std::shared_ptr<Instruction>>
-InstructionFactory::generateInstructions(
-    const std::shared_ptr<Process>& process) {
+InstructionFactory::generateInstructions(const int pid) {
     const int minLines = Config::getInstance().getMinInstructions();
     const int maxLines = Config::getInstance().getMaxInstructions();
     const int randMaxLines = generateRandomNum(minLines, maxLines);
@@ -88,7 +87,7 @@ InstructionFactory::generateInstructions(
         const int remainingLines = randMaxLines - accumulatedLines;
 
         auto instr =
-            createRandomInstruction(process, declaredVars, 0, remainingLines);
+            createRandomInstruction(pid, declaredVars, 0, remainingLines);
         const int lines = instr->getLineCount();
 
         if (lines > remainingLines) {
@@ -108,43 +107,41 @@ int InstructionFactory::generateRandomNum(const int min, const int max) {
 }
 
 std::shared_ptr<Instruction> InstructionFactory::createRandomInstruction(
-    const std::shared_ptr<Process>& process,
-    std::set<std::string>& declaredVars, const int currentNestLevel,
-    const int maxLines) {
+    const int pid, std::set<std::string>& declaredVars,
+    const int currentNestLevel, const int maxLines) {
     const bool isLoopable =
         currentNestLevel < MAX_NESTED_LEVELS && maxLines > 1;
 
     switch (generateRandomNum(0, isLoopable ? 6 : 5)) {
         case 0: {  // PRINT RANDOM QUOTE
-            return std::make_shared<PrintInstruction>(getRandomQuote(),
-                                                      process);
+            return std::make_shared<PrintInstruction>(getRandomQuote(), pid);
         }
         case 1: {  // PRINT VARIABLE VALUE
             if (declaredVars.empty())
                 return std::make_shared<PrintInstruction>(getRandomQuote(),
-                                                          process);
+                                                          pid);
             std::string var = getExistingVarName(declaredVars);
             std::string message = std::format("The value of {} is: ", var);
-            return std::make_shared<PrintInstruction>(message, process, var);
+            return std::make_shared<PrintInstruction>(message, pid, var);
         }
         case 2: {  // DECLARE
             std::string var = getNewVarName(declaredVars);
             uint16_t val =
                 static_cast<uint16_t>(generateRandomNum(0, UINT16_MAX));
             declaredVars.insert(var);
-            return std::make_shared<DeclareInstruction>(var, val, process);
+            return std::make_shared<DeclareInstruction>(var, val, pid);
         }
         case 3: {  // SLEEP
             return std::make_shared<SleepInstruction>(getRandomSleepTime(),
-                                                      process);
+                                                      pid);
         }
         case 4: {  // ADD
             std::string result = getNewVarName(declaredVars);
             Operand lhs = getRandomOperand(declaredVars);
             Operand rhs = getRandomOperand(declaredVars);
             declaredVars.insert(result);
-            return std::make_shared<ArithmeticInstruction>(
-                result, lhs, rhs, Operation::ADD, process);
+            return std::make_shared<ArithmeticInstruction>(result, lhs, rhs,
+                                                           Operation::ADD, pid);
         }
         case 5: {  // SUBTRACT
             std::string result = getNewVarName(declaredVars);
@@ -152,25 +149,25 @@ std::shared_ptr<Instruction> InstructionFactory::createRandomInstruction(
             Operand rhs = getRandomOperand(declaredVars);
             declaredVars.insert(result);
             return std::make_shared<ArithmeticInstruction>(
-                result, lhs, rhs, Operation::SUBTRACT, process);
+                result, lhs, rhs, Operation::SUBTRACT, pid);
         }
         case 6: {
-            return createForLoop(process, maxLines, declaredVars,
+            return createForLoop(pid, maxLines, declaredVars,
                                  currentNestLevel + 1);
         }
         default:;
     }
 
     // fallback
-    return std::make_shared<PrintInstruction>("Fallback Instruction", process);
+    return std::make_shared<PrintInstruction>("Fallback Instruction", pid);
 }
 
 std::shared_ptr<Instruction> InstructionFactory::createForLoop(
-    const std::shared_ptr<Process>& process, const int maxLines,
-    std::set<std::string>& declaredVars, const int currentNestLevel) {
+    const int pid, const int maxLines, std::set<std::string>& declaredVars,
+    const int currentNestLevel) {
     if (maxLines <= 1 || currentNestLevel > MAX_NESTED_LEVELS) {
         // Not enough space or exceeded nest level; fallback
-        return std::make_shared<PrintInstruction>("Invalid FOR loop", process);
+        return std::make_shared<PrintInstruction>("Invalid FOR loop", pid);
     }
 
     std::vector<std::shared_ptr<Instruction>> loopBody;
@@ -194,7 +191,7 @@ std::shared_ptr<Instruction> InstructionFactory::createForLoop(
         const int remainingLines = maxGeneratedLines - accumulatedLines;
 
         const auto instr = createRandomInstruction(
-            process, declaredVars, currentNestLevel + 1, remainingLines);
+            pid, declaredVars, currentNestLevel + 1, remainingLines);
 
         const int lineCount = instr->getLineCount();
 
@@ -208,5 +205,5 @@ std::shared_ptr<Instruction> InstructionFactory::createForLoop(
         loopBody.push_back(instr);
     }
 
-    return std::make_shared<ForInstruction>(process, loopCount, loopBody);
+    return std::make_shared<ForInstruction>(pid, loopCount, loopBody);
 }

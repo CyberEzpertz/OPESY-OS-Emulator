@@ -7,10 +7,12 @@ class Process;
 class Instruction {
 protected:
     int lineCount;
-    std::shared_ptr<Process> process;
+    int pid;
+
+    std::shared_ptr<Process> getProcess() const;
 
 public:
-    explicit Instruction(int lines, std::shared_ptr<Process> process);
+    explicit Instruction(int lines, int pid);
 
     virtual ~Instruction() = default;
 

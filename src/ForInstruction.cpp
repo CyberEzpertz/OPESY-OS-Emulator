@@ -1,9 +1,9 @@
 #include "ForInstruction.h"
 
 ForInstruction::ForInstruction(
-    const std::shared_ptr<Process> &process, const int totalLoops,
+    const int pid, const int totalLoops,
     const std::vector<std::shared_ptr<Instruction>> &instructions)
-    : Instruction(0, process),
+    : Instruction(0, pid),
       totalLoops(totalLoops),
       currentLoop(0),
       currentInstructIdx(0),

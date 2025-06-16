@@ -8,7 +8,7 @@ class ForInstruction final : public Instruction {
 public:
     void execute() override;
     ForInstruction(
-        const std::shared_ptr<Process> &process, int totalLoops,
+        const int pid, int totalLoops,
         const std::vector<std::shared_ptr<Instruction>> &instructions);
 
     bool isComplete() const override;

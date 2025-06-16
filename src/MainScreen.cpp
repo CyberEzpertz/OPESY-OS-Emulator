@@ -189,7 +189,7 @@ void MainScreen::printProcessReport() {
     double cpuUtil =
         static_cast<double>(numCores - availableCores) / numCores * 100.0;
 
-    auto processes = ConsoleManager::getInstance().getProcesses();
+    auto processes = ConsoleManager::getInstance().getProcessNameMap();
 
     std::vector<std::shared_ptr<Process>> sorted;
 

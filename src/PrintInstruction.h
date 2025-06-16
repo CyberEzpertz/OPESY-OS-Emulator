@@ -14,10 +14,8 @@ private:
     std::string varName;
 
 public:
-    PrintInstruction(const std::string& msg,
-                     const std::shared_ptr<Process>& process);
-    PrintInstruction(const std::string& msg,
-                     const std::shared_ptr<Process>& process,
+    PrintInstruction(const std::string& msg, const int pid);
+    PrintInstruction(const std::string& msg, const int pid,
                      const std::string& varName);
 
     void execute() override;

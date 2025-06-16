@@ -2,10 +2,12 @@
 
 #include "Process.h"
 
-ArithmeticInstruction::ArithmeticInstruction(
-    const std::string& resultName, const Operand& lhsVar, const Operand& rhsVar,
-    const Operation& operation, const std::shared_ptr<Process>& process)
-    : Instruction(1, process),
+ArithmeticInstruction::ArithmeticInstruction(const std::string& resultName,
+                                             const Operand& lhsVar,
+                                             const Operand& rhsVar,
+                                             const Operation& operation,
+                                             const int pid)
+    : Instruction(1, pid),
       operation(operation),
       resultName(resultName),
       lhsVar(lhsVar),
@@ -14,6 +16,7 @@ ArithmeticInstruction::ArithmeticInstruction(
 void ArithmeticInstruction::execute() {
     const uint16_t lhsValue = resolveOperand(lhsVar);
     const uint16_t rhsValue = resolveOperand(rhsVar);
+    const auto process = getProcess();
 
     if (operation == ADD) {
         const uint32_t sum =
@@ -32,6 +35,8 @@ void ArithmeticInstruction::execute() {
 }
 
 uint16_t ArithmeticInstruction::resolveOperand(const Operand& op) const {
+    const auto process = getProcess();
+
     if (std::holds_alternative<std::string>(op)) {
         const auto& varName = std::get<std::string>(op);
         const auto value = process->getVariable(varName);

@@ -10,7 +10,7 @@ class ArithmeticInstruction final : public Instruction {
 public:
     ArithmeticInstruction(const std::string& resultName, const Operand& lhsVar,
                           const Operand& rhsVar, const Operation& operation,
-                          const std::shared_ptr<Process>& process);
+                          const int pid);
 
     void execute() override;
     uint16_t resolveOperand(const Operand& op) const;

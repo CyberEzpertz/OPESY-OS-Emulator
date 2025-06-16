@@ -1,17 +1,15 @@
-//
-// Created by Jan on 16/06/2025.
-//
-
 #include "SleepInstruction.h"
 
+#include "ConsoleManager.h"
 #include "ProcessScheduler.h"
 
-SleepInstruction::SleepInstruction(const uint8_t ticks,
-                                   const std::shared_ptr<Process>& process)
-    : Instruction(1, process), ticks(ticks) {
+SleepInstruction::SleepInstruction(const uint8_t ticks, const int pid)
+    : Instruction(1, pid), ticks(ticks) {
 }
 
 void SleepInstruction::execute() {
+    const auto process = getProcess();
+
     const auto currentTicks = ProcessScheduler::getInstance().getCurrentCycle();
     const uint64_t wakeupTick = ticks + currentTicks;
     process->setWakeupTick(wakeupTick);

@@ -2,7 +2,7 @@
 #include "Instruction.h"
 class SleepInstruction final : public Instruction {
 public:
-    SleepInstruction(uint8_t ticks, const std::shared_ptr<Process>& process);
+    SleepInstruction(uint8_t ticks, const int pid);
 
 private:
     uint8_t ticks;

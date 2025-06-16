@@ -7,7 +7,6 @@
 #include "Process.h"
 #include "ProcessScheduler.h"
 #include "ProcessScreen.h"
-#include "SleepInstruction.h"
 
 /// Initializes the console manager with the main screen and renders it.
 void ConsoleManager::initialize() {
@@ -39,8 +38,9 @@ ConsoleManager& ConsoleManager::getInstance() {
 ///
 /// Logs an error message if the screen name is not found.
 void ConsoleManager::switchConsole(const std::string& processName) {
-    if (processes.contains(processName)) {
-        currentScreen = std::make_shared<ProcessScreen>(processes[processName]);
+    if (processNameMap.contains(processName)) {
+        currentScreen =
+            std::make_shared<ProcessScreen>(processNameMap[processName]);
         clearConsole();
         currentScreen->render();
     } else {
@@ -52,15 +52,16 @@ void ConsoleManager::switchConsole(const std::string& processName) {
 /// Returns true if creation was successful, false if not.
 bool ConsoleManager::createProcess(const std::string& processName) {
     // Don't allow duplicate process names because we use that to access them
-    if (processes.contains(processName)) {
+    if (processNameMap.contains(processName)) {
         std::println("Error: Process '{}' already exists.", processName);
         return false;
     }
 
-    const int PID = processes.size() + 1;
+    const int PID = processIDList.size();
 
     const auto newProcess = std::make_shared<Process>(PID, processName);
-    processes[processName] = newProcess;
+    processNameMap[processName] = newProcess;
+    processIDList.push_back(newProcess);
 
     ProcessScheduler::getInstance().scheduleProcess(newProcess);
 
@@ -69,31 +70,21 @@ bool ConsoleManager::createProcess(const std::string& processName) {
 
 bool ConsoleManager::createDummyProcess(const std::string& processName) {
     // Don't allow duplicate process names because we use that to access them
-    if (processes.contains(processName)) {
+    if (processNameMap.contains(processName)) {
         std::println("Error: Process '{}' already exists.", processName);
         return false;
     }
 
-    const int PID = processes.size() + 1;
+    const int PID = processNameMap.size();
 
     const auto newProcess = std::make_shared<Process>(PID, processName);
-    const std::vector<std::shared_ptr<Instruction>> instructions =
-        InstructionFactory::generateInstructions(newProcess);
+    processNameMap[processName] = newProcess;
+    processIDList.push_back(newProcess);
 
-    // for (int i = 0; i < 100; i++) {
-    //     if (i % 2 == 0) {
-    //         instructions.push_back(std::make_shared<PrintInstruction>(
-    //             std::format("Hello world from {}!", newProcess->getName()),
-    //             newProcess));
-    //     } else {
-    //         instructions.push_back(
-    //             std::make_shared<SleepInstruction>(32, newProcess));
-    //     }
-    // }
+    const std::vector<std::shared_ptr<Instruction>> instructions =
+        InstructionFactory::generateInstructions(PID);
 
     newProcess->setInstructions(instructions);
-
-    processes[processName] = newProcess;
 
     ProcessScheduler::getInstance().scheduleProcess(newProcess);
 
@@ -123,7 +114,7 @@ void ConsoleManager::renderConsole() const {
 }
 
 /// Passes user input to the currently active screen for handling.
-void ConsoleManager::getUserInput() {
+void ConsoleManager::getUserInput() const {
     currentScreen->handleUserInput();
 }
 
@@ -135,8 +126,19 @@ bool ConsoleManager::getHasInitialized() const {
     return hasInitialized;
 }
 std::unordered_map<std::string, std::shared_ptr<Process>>
-ConsoleManager::getProcesses() {
-    return processes;
+ConsoleManager::getProcessNameMap() {
+    return processNameMap;
+}
+std::shared_ptr<Process> ConsoleManager::getProcessByPID(const int processID) {
+    if (processID >= processIDList.size()) {
+        return nullptr;
+    }
+
+    return processIDList[processID];
+}
+
+std::vector<std::shared_ptr<Process>> ConsoleManager::getProcessIdList() {
+    return processIDList;
 }
 
 /// Returns whether the application has been marked for exit.

@@ -3,23 +3,21 @@
 #include <print>
 #include <string>
 
+#include "ConsoleManager.h"
 #include "Process.h"
 
-PrintInstruction::PrintInstruction(const std::string& msg,
-                                   const std::shared_ptr<Process>& process)
-    : Instruction(1, process), message(msg), varName("") {
+PrintInstruction::PrintInstruction(const std::string& msg, const int pid)
+    : Instruction(1, pid), message(msg), varName("") {
 }
 
-PrintInstruction::PrintInstruction(const std::string& msg,
-                                   const std::shared_ptr<Process>& process,
+PrintInstruction::PrintInstruction(const std::string& msg, const int pid,
                                    const std::string& varName)
-    : Instruction(1, process), message(msg), varName(varName) {
+    : Instruction(1, pid), message(msg), varName(varName) {
 }
 
 void PrintInstruction::execute() {
-    if (!process) {
-        std::println("Error: Tried to print, but no process attached.");
-    }
+    const auto process = getProcess();
+
     std::string varValue =
         varName != "" ? std::to_string(process->getVariable(varName)) : "";
 
