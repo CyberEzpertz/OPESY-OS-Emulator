@@ -52,16 +52,6 @@ std::string getExistingVarName(const std::set<std::string>& declaredVars) {
     return *it;
 }
 
-Operand getRandomOperand(const std::set<std::string>& declaredVars) {
-    if (!declaredVars.empty() &&
-        InstructionFactory::generateRandomNum(0, 1) == 0) {
-        return getExistingVarName(declaredVars);
-    } else {
-        return static_cast<uint16_t>(
-            InstructionFactory::generateRandomNum(0, UINT16_MAX));
-    }
-}
-
 uint16_t getRandomUint16() {
     return static_cast<uint16_t>(
         InstructionFactory::generateRandomNum(0, UINT16_MAX));
@@ -106,6 +96,26 @@ int InstructionFactory::generateRandomNum(const int min, const int max) {
     return dist(rng);
 }
 
+std::string getRandomVarName(const std::set<std::string>& declaredVars) {
+    const bool useExisting = !declaredVars.empty() &&
+                             InstructionFactory::generateRandomNum(0, 1) == 0;
+
+    if (useExisting) {
+        return getExistingVarName(declaredVars);
+    } else {
+        return getNewVarName(declaredVars);
+    }
+}
+
+Operand getRandomOperand(const std::set<std::string>& declaredVars) {
+    if (InstructionFactory::generateRandomNum(0, 1) == 0) {
+        return getRandomVarName(declaredVars);
+    } else {
+        return static_cast<uint16_t>(
+            InstructionFactory::generateRandomNum(0, UINT16_MAX));
+    }
+}
+
 std::shared_ptr<Instruction> InstructionFactory::createRandomInstruction(
     const int pid, std::set<std::string>& declaredVars,
     const int currentNestLevel, const int maxLines) {
@@ -136,7 +146,7 @@ std::shared_ptr<Instruction> InstructionFactory::createRandomInstruction(
                                                       pid);
         }
         case 4: {  // ADD
-            std::string result = getNewVarName(declaredVars);
+            std::string result = getRandomVarName(declaredVars);
             Operand lhs = getRandomOperand(declaredVars);
             Operand rhs = getRandomOperand(declaredVars);
             declaredVars.insert(result);
@@ -144,7 +154,7 @@ std::shared_ptr<Instruction> InstructionFactory::createRandomInstruction(
                                                            Operation::ADD, pid);
         }
         case 5: {  // SUBTRACT
-            std::string result = getNewVarName(declaredVars);
+            std::string result = getRandomVarName(declaredVars);
             Operand lhs = getRandomOperand(declaredVars);
             Operand rhs = getRandomOperand(declaredVars);
             declaredVars.insert(result);
