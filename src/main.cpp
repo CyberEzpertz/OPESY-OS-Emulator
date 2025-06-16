@@ -1,25 +1,12 @@
-#include <iostream>
-#include <print>
-#include <string>
-
 #include "ConsoleManager.h"
-#include "MainScreen.h"
-#include "ProcessScheduler.h"
 
 int main() {
     ConsoleManager& console = ConsoleManager::getInstance();
-    ProcessScheduler& scheduler = ProcessScheduler::getInstance();
-
-    scheduler.initialize(4);
-    console.initialize();
-    console.createDummies(10);
-    scheduler.start();
+    console.initMainScreen();
 
     while (!console.getHasExited()) {
         console.getUserInput();
     }
-    scheduler.stop();
-    std::print("Test");
 
     return 0;
 }

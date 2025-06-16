@@ -24,6 +24,7 @@ public:
     /// @brief Initializes the program with the provided configs
     /// and instantiates the MainScreen.
     void initialize();
+    void initMainScreen();
 
     /// @brief Deleted copy assignment operator to enforce singleton pattern.
     void operator=(ConsoleManager const&) = delete;
@@ -56,6 +57,8 @@ public:
     /// @brief Signals the program to exit.
     void exitProgram();
 
+    bool getHasInitialized() const;
+
     std::unordered_map<std::string, std::shared_ptr<Process>> getProcesses();
 
     void returnToMainScreen();
@@ -63,6 +66,9 @@ public:
 private:
     /// @brief Flag to indicate if the program should exit.
     bool hasExited = false;
+
+    /// @brief Flag to indicate if the program has been initialized.
+    bool hasInitialized = false;
 
     /// @brief Private constructor to enforce singleton pattern.
     ConsoleManager() = default;

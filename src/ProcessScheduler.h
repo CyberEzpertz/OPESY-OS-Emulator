@@ -5,11 +5,10 @@
 #include <deque>
 #include <memory>
 #include <mutex>
-#include <string>
 #include <thread>
 #include <vector>
 
-enum class SchedulerType { FCFS, RR };
+#include "Config.h"
 
 class Process;  // Forward declaration
 
@@ -21,7 +20,7 @@ public:
     void stop();
     int getNumAvailableCores() const;
     int getNumTotalCores() const;
-    void initialize(int numCores);  // TODO
+    void initialize();
     void scheduleProcess(const std::shared_ptr<Process>& process);
     void sortQueue();  // FCFS only
     uint64_t getCurrentCycle() const;

@@ -21,21 +21,35 @@ MainScreen& MainScreen::getInstance() {
 /// @brief Renders the main screen header and starts handling user input.
 void MainScreen::render() {
     const std::string asciiArt =
-        "  ____ ____   ___  ____  _____ ______   __\n"
-        " / ___/ ___| / _ \\|  _ \\| ____/ ___\\ \\ / /\n"
-        "| |   \\___ \\| | | | |_) |  _| \\___ \\\\ V / \n"
-        "| |___ ___) | |_| |  __/| |___ ___) || |  \n"
-        " \\____|____/ \\___/|_|   |_____|____/ |_|  \n";
+        R"(
+__________                         .__       ________    _________
+\______   \ _______  __ ___________|__| ____ \_____  \  /   _____/
+ |       _// __ \  \/ // __ \_  __ \  |/ __ \ /   |   \ \_____  \
+ |    |   \  ___/\   /\  ___/|  | \/  \  ___//    |    \/        \
+ |____|_  /\___  >\_/  \___  >__|  |__|\___  >_______  /_______  /
+        \/     \/          \/              \/        \/        \/
+)";
 
+    setColor(35);
     std::print("{}", asciiArt);
+    resetColor();
 
+    std::println("{:->60}", "");
     setColor(36);
-    std::println("Hello, Welcome to the CSOPESY commandline!");
+    std::println("Hello, Welcome to the ReverieOS commandline!");
     resetColor();
 
-    setColor(33);
-    std::println("Type 'exit' to quit, 'clear' to clear the screen");
-    resetColor();
+    if (ConsoleManager::getInstance().getHasInitialized()) {
+        setColor(33);
+        std::println("Type 'exit' to quit, 'clear' to clear the screen");
+        resetColor();
+    } else {
+        setColor(33);
+        std::println("Type 'initialize' to start the program, exit' to quit");
+        resetColor();
+    }
+
+    std::println("{:->60}", "");
 }
 ///
 /// @brief Processes a single user command from standard input.
@@ -49,6 +63,7 @@ void MainScreen::render() {
 /// - "clear": Clears the console screen and prints the header.
 /// - "screen -s <name>": Placeholder for creating a new screen.
 /// - "screen -r <name>": Placeholder for resuming a screen.
+/// - "screen -ls": Displays the processes
 /// - "scheduler-test", "scheduler-stop", "report-util", "initialize":
 /// Placeholders for other commands.
 ///
@@ -56,7 +71,10 @@ void MainScreen::render() {
 ///
 void MainScreen::handleUserInput() {
     std::string input;
-    std::print("Enter a command: ");
+    setColor(35);
+    std::print("reverie-✦> ");
+    resetColor();
+
     std::getline(std::cin, input);
 
     // Normalize whitespace (collapse multiple spaces)
@@ -73,33 +91,76 @@ void MainScreen::handleUserInput() {
     const std::string& cmd = tokens[0];
     ConsoleManager& console = ConsoleManager::getInstance();
 
+    if (!console.getHasInitialized()) {
+        if (cmd == "exit") {
+            console.exitProgram();
+        } else if (cmd == "initialize") {
+            console.initialize();
+            std::println("Program initialized");
+        } else {
+            std::println("Error: Program has not been initialized. Please type "
+                         "\"initialize\" before proceeding.");
+        }
+        return;
+    }
+
     if (cmd == "exit") {
         console.exitProgram();  // Trigger outer loop exit
     } else if (cmd == "clear") {
-        console.clearConsole();
+        ConsoleManager::clearConsole();
         render();
     } else if (cmd == "screen") {
-        if (tokens.size() < 3) {
-            if (tokens[1] == "-ls") {
-                printProcessReport();
-            } else {
-                std::println("Not enough arguments for screen command.");
-            }
-        } else if (tokens[1] == "-s") {
-            const bool success = console.createProcess(tokens[2]);
-            if (success)
-                console.switchConsole(tokens[2]);
-        } else if (tokens[1] == "-r") {
-            console.switchConsole(tokens[2]);
-        } else {
-            std::println("Invalid screen flag: {}", tokens[1]);
-        }
+        handleScreenCommand(tokens);
+    } else if (cmd == "initialize") {
+        std::println("Program has already been initialized.");
     } else if (cmd == "scheduler-test" || cmd == "scheduler-stop" ||
-               cmd == "report-util" || cmd == "initialize") {
+               cmd == "report-util") {
         printPlaceholder(cmd);
     } else {
-        std::println("Unknown command: {}", cmd);
+        std::println("Error: Unknown command {}", cmd);
     }
+}
+
+void MainScreen::handleScreenCommand(const std::vector<std::string>& tokens) {
+    auto& console = ConsoleManager::getInstance();
+
+    if (tokens.size() < 2) {
+        std::println("Error: Not enough arguments for screen command.");
+        return;
+    }
+
+    const std::string& flag = tokens[1];
+
+    if (flag == "-ls") {
+        if (tokens.size() > 2) {
+            std::println("Error: Too many arguments for -ls.");
+        } else {
+            printProcessReport();
+        }
+        return;
+    }
+
+    if (flag == "-s" || flag == "-r") {
+        if (tokens.size() < 3) {
+            std::println("Error: Missing process name for {} flag.", flag);
+            return;
+        }
+
+        const std::string& processName = tokens[2];
+
+        if (flag == "-s") {
+            if (console.createProcess(processName)) {
+                console.switchConsole(processName);
+            }
+        } else {  // -r
+            console.switchConsole(processName);
+        }
+
+        return;
+    }
+
+    // If the flag is not recognized
+    std::println("Invalid screen flag: {}", flag);
 }
 
 /// @brief Sets the console text color using ANSI escape codes.

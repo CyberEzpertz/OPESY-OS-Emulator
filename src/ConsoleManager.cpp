@@ -8,8 +8,13 @@
 #include "ProcessScreen.h"
 
 /// Initializes the console manager with the main screen and renders it.
-/// TODO: Will read the config file and use the parameters there in the future.
 void ConsoleManager::initialize() {
+    hasInitialized = true;
+    Config::getInstance().loadFromFile();
+    ProcessScheduler::getInstance().initialize();
+}
+
+void ConsoleManager::initMainScreen() {
     currentScreen = std::make_shared<MainScreen>(MainScreen::getInstance());
     renderConsole();
 }
@@ -47,7 +52,7 @@ bool ConsoleManager::createProcess(const std::string& processName) {
 
     const int PID = processes.size() + 1;
 
-    auto newProcess = std::make_shared<Process>(PID, processName);
+    const auto newProcess = std::make_shared<Process>(PID, processName);
     processes[processName] = newProcess;
 
     ProcessScheduler::getInstance().scheduleProcess(newProcess);
@@ -112,6 +117,9 @@ void ConsoleManager::getUserInput() {
 /// Sets the exit flag to true, signaling the main loop to terminate.
 void ConsoleManager::exitProgram() {
     hasExited = true;
+}
+bool ConsoleManager::getHasInitialized() const {
+    return hasInitialized;
 }
 std::unordered_map<std::string, std::shared_ptr<Process>>
 ConsoleManager::getProcesses() {

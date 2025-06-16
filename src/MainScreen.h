@@ -29,6 +29,7 @@ public:
     /// @brief Handles user input, parses commands, and performs corresponding
     /// actions.
     void handleUserInput() override;
+    void handleScreenCommand(const std::vector<std::string>& tokens);
 
 private:
     /// @brief Private constructor to enforce singleton pattern.

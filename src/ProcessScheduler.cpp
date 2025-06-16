@@ -12,7 +12,10 @@ ProcessScheduler& ProcessScheduler::getInstance() {
     return instance;
 }
 
-ProcessScheduler::ProcessScheduler() = default;
+ProcessScheduler::ProcessScheduler() {
+    this->numCpuCores = Config::getInstance().getNumCPUs();
+    this->availableCores = Config::getInstance().getNumCPUs();
+};
 
 ProcessScheduler::~ProcessScheduler() {
     running = false;
@@ -57,9 +60,9 @@ int ProcessScheduler::getNumTotalCores() const {
     return numCpuCores;
 }
 
-void ProcessScheduler::initialize(const int numCores) {
-    this->numCpuCores = numCores;
-    this->availableCores = numCores;
+void ProcessScheduler::initialize() {
+    this->numCpuCores = Config::getInstance().getNumCPUs();
+    this->availableCores = Config::getInstance().getNumCPUs();
 }
 
 void ProcessScheduler::scheduleProcess(
