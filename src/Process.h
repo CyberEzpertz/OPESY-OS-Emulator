@@ -6,6 +6,7 @@
 
 #include <atomic>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "Instruction.h"
@@ -86,6 +87,8 @@ public:
     int getCurrentCore() const;
     void setInstructions(
         const std::vector<std::shared_ptr<Instruction>>& instructions);
+    void setVariable(const std::string& name, uint16_t value);
+    uint16_t getVariable(const std::string& name);
 
 private:
     int processID;                  ///< Unique identifier for the process.
@@ -97,6 +100,7 @@ private:
     ProcessStatus status;
     std::atomic<int> currentCore = -1;
     std::vector<std::shared_ptr<Instruction>> instructions;
+    std::unordered_map<std::string, uint16_t> variables;
 
     /**
      * @brief Generates a formatted timestamp for the process creation time.

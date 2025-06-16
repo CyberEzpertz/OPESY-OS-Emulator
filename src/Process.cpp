@@ -108,6 +108,18 @@ void Process::setInstructions(
     this->instructions = instructions;
     this->totalLines = instructions.size();
 }
+void Process::setVariable(const std::string& name, const uint16_t value) {
+    variables[name] = value;
+}
+
+uint16_t Process::getVariable(const std::string& name) {
+    // If it doesn't exist, should be default value of 0
+    if (!variables.contains(name)) {
+        variables[name] = 0;
+    }
+
+    return variables[name];
+}
 
 /**
  * @brief Writes all existing log entries to a file under the ./logs directory.
