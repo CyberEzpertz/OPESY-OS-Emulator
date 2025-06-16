@@ -14,7 +14,9 @@ ForInstruction::ForInstruction(
     for (const auto &line : instructions) {
         totalLineCount += line->getLineCount();
     }
-    totalLines = totalLineCount;
+
+    // We add 1 because the for itself is a line of code
+    totalLines = totalLineCount + 1;
 }
 
 void ForInstruction::execute() {
