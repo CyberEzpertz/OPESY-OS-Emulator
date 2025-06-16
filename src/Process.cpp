@@ -20,7 +20,11 @@ Process::Process(const int id, const std::string& name)
       status(READY),
       currentCore(-1),
       wakeupTick(0) {
-    totalLines = instructions.size();
+    totalLines = 0;
+    for (const auto& instr : instructions) {
+        totalLines += instr->getLineCount();
+    }
+
     timestamp = generateTimestamp();
 }
 /**
@@ -106,7 +110,7 @@ void Process::setStatus(const ProcessStatus newStatus) {
     this->status = newStatus;
 }
 
-void Process::setCurrentCore(int coreId) {
+void Process::setCurrentCore(const int coreId) {
     currentCore = coreId;
 }
 int Process::getCurrentCore() const {
@@ -115,7 +119,11 @@ int Process::getCurrentCore() const {
 void Process::setInstructions(
     const std::vector<std::shared_ptr<Instruction>>& instructions) {
     this->instructions = instructions;
-    this->totalLines = instructions.size();
+    this->totalLines = 0;
+
+    for (const auto& instr : instructions) {
+        this->totalLines += instr->getLineCount();
+    }
 }
 void Process::setVariable(const std::string& name, const uint16_t value) {
     variables[name] = value;

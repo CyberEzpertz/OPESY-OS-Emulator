@@ -16,6 +16,9 @@ void ConsoleManager::initialize() {
     ProcessScheduler::getInstance().initialize();
     createDummies(10);
     ProcessScheduler::getInstance().start();
+
+    // NOTE: This is for debugging only.
+    // Config::getInstance().print();
 }
 
 void ConsoleManager::initMainScreen() {

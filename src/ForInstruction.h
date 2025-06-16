@@ -20,7 +20,6 @@ private:
     int nestLevel = 1;
     int currentInstructIdx;
     int totalInstructions;
-    int totalLines;
 
     std::vector<std::shared_ptr<Instruction>> instructions;
 };
