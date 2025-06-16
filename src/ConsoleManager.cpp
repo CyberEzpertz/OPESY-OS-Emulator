@@ -11,9 +11,10 @@
 void ConsoleManager::initialize() {
     hasInitialized = true;
     Config::getInstance().loadFromFile();
+    ProcessScheduler::getInstance().initialize();
 }
 
-ConsoleManager::ConsoleManager() {
+void ConsoleManager::initMainScreen() {
     currentScreen = std::make_shared<MainScreen>(MainScreen::getInstance());
     renderConsole();
 }

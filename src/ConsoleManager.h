@@ -24,6 +24,7 @@ public:
     /// @brief Initializes the program with the provided configs
     /// and instantiates the MainScreen.
     void initialize();
+    void initMainScreen();
 
     /// @brief Deleted copy assignment operator to enforce singleton pattern.
     void operator=(ConsoleManager const&) = delete;
@@ -70,7 +71,7 @@ private:
     bool hasInitialized = false;
 
     /// @brief Private constructor to enforce singleton pattern.
-    ConsoleManager();
+    ConsoleManager() = default;
 
     /// @brief Renders the currently active screen.
     ///

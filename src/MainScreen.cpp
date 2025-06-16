@@ -21,21 +21,35 @@ MainScreen& MainScreen::getInstance() {
 /// @brief Renders the main screen header and starts handling user input.
 void MainScreen::render() {
     const std::string asciiArt =
-        "  ____ ____   ___  ____  _____ ______   __\n"
-        " / ___/ ___| / _ \\|  _ \\| ____/ ___\\ \\ / /\n"
-        "| |   \\___ \\| | | | |_) |  _| \\___ \\\\ V / \n"
-        "| |___ ___) | |_| |  __/| |___ ___) || |  \n"
-        " \\____|____/ \\___/|_|   |_____|____/ |_|  \n";
+        R"(
+__________                         .__       ________    _________
+\______   \ _______  __ ___________|__| ____ \_____  \  /   _____/
+ |       _// __ \  \/ // __ \_  __ \  |/ __ \ /   |   \ \_____  \
+ |    |   \  ___/\   /\  ___/|  | \/  \  ___//    |    \/        \
+ |____|_  /\___  >\_/  \___  >__|  |__|\___  >_______  /_______  /
+        \/     \/          \/              \/        \/        \/
+)";
 
+    setColor(35);
     std::print("{}", asciiArt);
+    resetColor();
 
+    std::println("{:->60}", "");
     setColor(36);
-    std::println("Hello, Welcome to the CSOPESY commandline!");
+    std::println("Hello, Welcome to the ReverieOS commandline!");
     resetColor();
 
-    setColor(33);
-    std::println("Type 'exit' to quit, 'clear' to clear the screen");
-    resetColor();
+    if (ConsoleManager::getInstance().getHasInitialized()) {
+        setColor(33);
+        std::println("Type 'exit' to quit, 'clear' to clear the screen");
+        resetColor();
+    } else {
+        setColor(33);
+        std::println("Type 'initialize' to start the program, exit' to quit");
+        resetColor();
+    }
+
+    std::println("{:->60}", "");
 }
 ///
 /// @brief Processes a single user command from standard input.
@@ -57,7 +71,10 @@ void MainScreen::render() {
 ///
 void MainScreen::handleUserInput() {
     std::string input;
-    std::print("Enter a command: ");
+    setColor(35);
+    std::print("reverie-✦> ");
+    resetColor();
+
     std::getline(std::cin, input);
 
     // Normalize whitespace (collapse multiple spaces)

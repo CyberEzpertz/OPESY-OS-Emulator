@@ -2,6 +2,7 @@
 
 int main() {
     ConsoleManager& console = ConsoleManager::getInstance();
+    console.initMainScreen();
 
     while (!console.getHasExited()) {
         console.getUserInput();
