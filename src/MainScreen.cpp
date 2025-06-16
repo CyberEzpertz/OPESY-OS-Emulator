@@ -79,6 +79,7 @@ void MainScreen::handleUserInput() {
             console.exitProgram();
         } else if (cmd == "initialize") {
             console.initialize();
+            std::println("Program initialized");
         } else {
             std::println("Error: Program has not been initialized. Please type "
                          "\"initialize\" before proceeding.");
