@@ -2,6 +2,7 @@
 
 #include <print>
 
+#include "InstructionFactory.h"
 #include "MainScreen.h"
 #include "Process.h"
 #include "ProcessScheduler.h"
@@ -73,18 +74,19 @@ bool ConsoleManager::createDummyProcess(const std::string& processName) {
     const int PID = processes.size() + 1;
 
     const auto newProcess = std::make_shared<Process>(PID, processName);
-    std::vector<std::shared_ptr<Instruction>> instructions;
+    const std::vector<std::shared_ptr<Instruction>> instructions =
+        InstructionFactory::generateInstructions(newProcess);
 
-    for (int i = 0; i < 100; i++) {
-        if (i % 2 == 0) {
-            instructions.push_back(std::make_shared<PrintInstruction>(
-                std::format("Hello world from {}!", newProcess->getName()),
-                newProcess));
-        } else {
-            instructions.push_back(
-                std::make_shared<SleepInstruction>(32, newProcess));
-        }
-    }
+    // for (int i = 0; i < 100; i++) {
+    //     if (i % 2 == 0) {
+    //         instructions.push_back(std::make_shared<PrintInstruction>(
+    //             std::format("Hello world from {}!", newProcess->getName()),
+    //             newProcess));
+    //     } else {
+    //         instructions.push_back(
+    //             std::make_shared<SleepInstruction>(32, newProcess));
+    //     }
+    // }
 
     newProcess->setInstructions(instructions);
 
