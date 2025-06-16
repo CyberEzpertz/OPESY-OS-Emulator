@@ -23,6 +23,8 @@ add_executable(os_emulator src/main.cpp
         src/SleepInstruction.h
         src/DeclareInstruction.cpp
         src/DeclareInstruction.h
+        src/ArithmeticInstruction.cpp
+        src/ArithmeticInstruction.h
 )
 
 set_property(TARGET os_emulator PROPERTY CXX_STANDARD 23)
