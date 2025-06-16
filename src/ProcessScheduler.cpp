@@ -12,7 +12,10 @@ ProcessScheduler& ProcessScheduler::getInstance() {
     return instance;
 }
 
-ProcessScheduler::ProcessScheduler() { numCpuCores = };
+ProcessScheduler::ProcessScheduler() {
+    this->numCpuCores = Config::getInstance().getNumCPUs();
+    this->availableCores = Config::getInstance().getNumCPUs();
+};
 
 ProcessScheduler::~ProcessScheduler() {
     running = false;
