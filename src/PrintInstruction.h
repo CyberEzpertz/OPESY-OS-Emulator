@@ -13,7 +13,8 @@ private:
     std::string message;
 
 public:
-    PrintInstruction(const std::string& msg, std::shared_ptr<Process> process);
+    PrintInstruction(const std::string& msg,
+                     const std::shared_ptr<Process>& process);
 
     void execute() override;
 

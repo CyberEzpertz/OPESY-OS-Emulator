@@ -12,8 +12,8 @@
 #include <iostream>
 #include <sstream>
 
-Process::Process(int id, std::string name)
-    : processID(id), currentLine(0), status(READY), processName(name) {
+Process::Process(const int id, const std::string& name)
+    : processID(id), processName(name), currentLine(0), status(READY) {
     totalLines = instructions.size();
     timestamp = generateTimestamp();
 }
@@ -119,6 +119,12 @@ uint16_t Process::getVariable(const std::string& name) {
     }
 
     return variables[name];
+}
+uint32_t Process::getWakeupTick() const {
+    return wakeupTick;
+}
+void Process::setWakeupTick(const uint32_t value) {
+    this->wakeupTick = value;
 }
 
 /**

@@ -5,12 +5,20 @@
 #include <deque>
 #include <memory>
 #include <mutex>
+#include <queue>
 #include <thread>
 #include <vector>
 
 #include "Config.h"
+#include "Process.h"
 
-class Process;  // Forward declaration
+// For the min-heap waiting queue
+struct WakeupComparator {
+    bool operator()(const std::shared_ptr<Process>& a,
+                    const std::shared_ptr<Process>& b) const {
+        return a->getWakeupTick() > b->getWakeupTick();
+    }
+};
 
 class ProcessScheduler {
 public:
@@ -22,7 +30,8 @@ public:
     int getNumTotalCores() const;
     void initialize();
     void scheduleProcess(const std::shared_ptr<Process>& process);
-    void sortQueue();  // FCFS only
+    void sortQueue();
+    void sleepProcess(const std::shared_ptr<Process>& process);
     uint64_t getCurrentCycle() const;
 
 private:
@@ -42,9 +51,14 @@ private:
     SchedulerType schedulerType = SchedulerType::FCFS;
     uint32_t quantumCycles = 1;
 
-    std::deque<std::shared_ptr<Process>> processQueue;
-    std::condition_variable queueCv;
-    std::mutex queueMutex;
+    std::deque<std::shared_ptr<Process>> readyQueue;
+    std::condition_variable readyCv;
+    std::mutex readyMutex;
+
+    std::priority_queue<std::shared_ptr<Process>,
+                        std::vector<std::shared_ptr<Process>>, WakeupComparator>
+        waitQueue;
+    std::mutex waitMutex;
 
     std::condition_variable tickCv;
     std::mutex tickMutex;

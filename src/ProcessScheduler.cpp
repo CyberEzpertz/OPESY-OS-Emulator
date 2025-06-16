@@ -49,7 +49,7 @@ void ProcessScheduler::start() {
 void ProcessScheduler::stop() {
     running = false;
     tickCv.notify_all();
-    queueCv.notify_all();
+    readyCv.notify_all();
 }
 
 int ProcessScheduler::getNumAvailableCores() const {
@@ -68,16 +68,20 @@ void ProcessScheduler::initialize() {
 void ProcessScheduler::scheduleProcess(
     const std::shared_ptr<Process>& process) {
     {
-        std::lock_guard<std::mutex> lock(queueMutex);
-        processQueue.push_back(process);
+        std::lock_guard<std::mutex> lock(readyMutex);
+        readyQueue.push_back(process);
     }
 
     // Wake one worker in case they were waiting for work
-    queueCv.notify_one();
+    readyCv.notify_one();
 }
 
 void ProcessScheduler::sortQueue() {
     // TODO: Implement this when needed
+}
+
+void ProcessScheduler::sleepProcess(const std::shared_ptr<Process>& process) {
+    this->waitQueue.push(process);
 }
 
 uint64_t ProcessScheduler::getCurrentCycle() const {
@@ -88,11 +92,19 @@ void ProcessScheduler::incrementCpuCycles() {
     {
         std::lock_guard<std::mutex> lock(tickMutex);
         ++cpuCycles;
-
-        // if (processQueue.empty() && availableCores.load() == numCpuCores) {
-        //     running = false;
-        // }
     }
+
+    // Wakeup all sleeping processes that need to wakeup
+    // NOTE: This should be put before tickCv, otherwise the cores might not be
+    // able to get the recently woken up processes
+    while (!waitQueue.empty() &&
+           waitQueue.top()->getWakeupTick() <= cpuCycles) {
+        auto proc = waitQueue.top();
+        waitQueue.pop();
+        proc->setStatus(READY);
+        scheduleProcess(proc);
+    }
+
     tickCv.notify_all();  // Notify all worker threads that a new tick occurred
 }
 
@@ -110,14 +122,13 @@ void ProcessScheduler::workerLoop(int coreId) {
     while (running) {
         // Get a process from the queue
         {
-            std::unique_lock<std::mutex> lock(queueMutex);
+            std::unique_lock<std::mutex> lock(readyMutex);
 
-            queueCv.wait(lock,
-                         [&] { return !processQueue.empty() || !running; });
+            readyCv.wait(lock, [&] { return !readyQueue.empty() || !running; });
 
-            if (!processQueue.empty()) {
-                proc = processQueue.front();
-                processQueue.pop_front();
+            if (!readyQueue.empty()) {
+                proc = readyQueue.front();
+                readyQueue.pop_front();
 
                 proc->setStatus(RUNNING);
                 proc->setCurrentCore(coreId);
