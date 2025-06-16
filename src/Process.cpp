@@ -13,7 +13,13 @@
 #include <sstream>
 
 Process::Process(const int id, const std::string& name)
-    : processID(id), processName(name), currentLine(0), status(READY) {
+    : processID(id),
+      processName(name),
+      currentLine(0),
+      currentInstructionIndex(0),
+      status(READY),
+      currentCore(-1),
+      wakeupTick(0) {
     totalLines = instructions.size();
     timestamp = generateTimestamp();
 }
@@ -79,8 +85,11 @@ void Process::log(const std::string& entry) {
  */
 void Process::incrementLine() {
     if (currentLine < totalLines) {
-        instructions[currentLine]->execute();
+        instructions[currentInstructionIndex]->execute();
         currentLine++;
+
+        if (instructions[currentInstructionIndex]->isComplete())
+            currentInstructionIndex++;
     }
 
     if (currentLine >= totalLines) {

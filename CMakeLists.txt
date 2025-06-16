@@ -25,6 +25,8 @@ add_executable(os_emulator src/main.cpp
         src/DeclareInstruction.h
         src/ArithmeticInstruction.cpp
         src/ArithmeticInstruction.h
+        src/ForInstruction.cpp
+        src/ForInstruction.h
 )
 
 set_property(TARGET os_emulator PROPERTY CXX_STANDARD 23)
