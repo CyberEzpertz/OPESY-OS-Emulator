@@ -89,8 +89,8 @@ public:
         const std::vector<std::shared_ptr<Instruction>>& instructions);
     void setVariable(const std::string& name, uint16_t value);
     uint16_t getVariable(const std::string& name);
-    uint32_t getWakeupTick() const;
-    void setWakeupTick(uint32_t value);
+    uint64_t getWakeupTick() const;
+    void setWakeupTick(const uint64_t value);
 
 private:
     int processID;                  ///< Unique identifier for the process.
@@ -103,7 +103,7 @@ private:
     std::atomic<int> currentCore = -1;
     std::vector<std::shared_ptr<Instruction>> instructions;
     std::unordered_map<std::string, uint16_t> variables;
-    uint32_t wakeupTick = 0;
+    uint64_t wakeupTick = 0;
 
     /**
      * @brief Generates a formatted timestamp for the process creation time.

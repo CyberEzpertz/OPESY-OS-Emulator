@@ -120,10 +120,10 @@ uint16_t Process::getVariable(const std::string& name) {
 
     return variables[name];
 }
-uint32_t Process::getWakeupTick() const {
+uint64_t Process::getWakeupTick() const {
     return wakeupTick;
 }
-void Process::setWakeupTick(const uint32_t value) {
+void Process::setWakeupTick(const uint64_t value) {
     this->wakeupTick = value;
 }
 
