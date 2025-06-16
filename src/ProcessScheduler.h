@@ -5,11 +5,10 @@
 #include <deque>
 #include <memory>
 #include <mutex>
-#include <string>
 #include <thread>
 #include <vector>
 
-enum class SchedulerType { FCFS, RR };
+#include "Config.h"
 
 class Process;  // Forward declaration
 

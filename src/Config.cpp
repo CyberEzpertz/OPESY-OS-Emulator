@@ -13,7 +13,18 @@ std::string stripQuotes(const std::string& input) {
     return input;
 }
 
-bool Config::loadFromFile(const std::string& filePath = "../config.txt") {
+Config::Config() {
+    this->loadFromFile();
+}
+
+Config& Config::getInstance() {
+    static Config instance;
+
+    return instance;
+}
+
+bool Config::loadFromFile() {
+    const std::string& filePath = "../config.txt";
     std::ifstream file(filePath);
     if (!file.is_open()) {
         std::cerr << "Error: Could not open config file: " << filePath << "\n";
@@ -82,4 +93,16 @@ uint32_t Config::getMaxInstructions() const {
 
 uint32_t Config::getDelaysPerExec() const {
     return delaysPerExec;
+}
+void Config::print() const {
+    std::cout << "=== Loaded Configuration ===\n";
+    std::cout << "Number of CPUs       : " << numCPUs << '\n';
+    std::cout << "Scheduler            : "
+              << (scheduler == SchedulerType::FCFS ? "FCFS" : "RR") << '\n';
+    std::cout << "Quantum Cycles       : " << quantumCycles << '\n';
+    std::cout << "Batch Process Freq   : " << batchProcessFreq << '\n';
+    std::cout << "Min Instructions     : " << minInstructions << '\n';
+    std::cout << "Max Instructions     : " << maxInstructions << '\n';
+    std::cout << "Delays per Execution : " << delaysPerExec << '\n';
+    std::cout << "=============================\n";
 }

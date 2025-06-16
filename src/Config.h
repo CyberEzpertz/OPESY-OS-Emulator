@@ -10,7 +10,14 @@ enum class SchedulerType {
 
 class Config {
 public:
-    bool loadFromFile(const std::string& filePath);
+    // Meyer's singleton stuff
+    static Config& getInstance();
+    Config(const Config&) = delete;
+    Config(Config&&) = delete;
+    Config& operator=(const Config&) = delete;
+    Config& operator=(Config&&) = delete;
+
+    bool loadFromFile();
 
     [[nodiscard]] int getNumCPUs() const;
     [[nodiscard]] SchedulerType getSchedulerType() const;
@@ -19,8 +26,12 @@ public:
     [[nodiscard]] uint32_t getMinInstructions() const;
     [[nodiscard]] uint32_t getMaxInstructions() const;
     [[nodiscard]] uint32_t getDelaysPerExec() const;
+    void print() const;
 
 private:
+    // Private constructor to prevent instantiation
+    Config();
+
     // Default values from the specs
     int numCPUs = 4;
     SchedulerType scheduler = SchedulerType::RR;

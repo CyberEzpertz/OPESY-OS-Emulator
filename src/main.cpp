@@ -1,9 +1,7 @@
-#include <iostream>
 #include <print>
-#include <string>
 
+#include "Config.h"
 #include "ConsoleManager.h"
-#include "MainScreen.h"
 #include "ProcessScheduler.h"
 
 int main() {
@@ -14,6 +12,7 @@ int main() {
     console.initialize();
     console.createDummies(10);
     scheduler.start();
+    Config::getInstance().print();
 
     while (!console.getHasExited()) {
         console.getUserInput();
