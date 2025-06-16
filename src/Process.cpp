@@ -90,7 +90,7 @@ void Process::incrementLine() {
 }
 
 ProcessStatus Process::getStatus() const {
-    return status;
+    return status.load();
 }
 
 void Process::setStatus(const ProcessStatus newStatus) {
@@ -110,6 +110,10 @@ void Process::setInstructions(
 }
 void Process::setVariable(const std::string& name, const uint16_t value) {
     variables[name] = value;
+}
+
+bool Process::getIsFinished() const {
+    return currentLine >= totalLines;
 }
 
 uint16_t Process::getVariable(const std::string& name) {

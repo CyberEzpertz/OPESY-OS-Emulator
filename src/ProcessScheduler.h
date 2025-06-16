@@ -33,6 +33,7 @@ public:
     void sortQueue();
     void sleepProcess(const std::shared_ptr<Process>& process);
     uint64_t getCurrentCycle() const;
+    void printQueues() const;
 
 private:
     ProcessScheduler();

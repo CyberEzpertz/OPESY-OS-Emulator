@@ -88,6 +88,7 @@ public:
     void setInstructions(
         const std::vector<std::shared_ptr<Instruction>>& instructions);
     void setVariable(const std::string& name, uint16_t value);
+    bool getIsFinished() const;
     uint16_t getVariable(const std::string& name);
     uint64_t getWakeupTick() const;
     void setWakeupTick(const uint64_t value);
@@ -99,7 +100,7 @@ private:
     int currentLine;                ///< Current line number being executed.
     int totalLines;         ///< Total lines of code the process will execute.
     std::string timestamp;  ///< Timestamp when the process was created.
-    ProcessStatus status;
+    std::atomic<ProcessStatus> status;
     std::atomic<int> currentCore = -1;
     std::vector<std::shared_ptr<Instruction>> instructions;
     std::unordered_map<std::string, uint16_t> variables;

@@ -6,12 +6,15 @@
 #include "Process.h"
 #include "ProcessScheduler.h"
 #include "ProcessScreen.h"
+#include "SleepInstruction.h"
 
 /// Initializes the console manager with the main screen and renders it.
 void ConsoleManager::initialize() {
     hasInitialized = true;
     Config::getInstance().loadFromFile();
     ProcessScheduler::getInstance().initialize();
+    createDummies(10);
+    ProcessScheduler::getInstance().start();
 }
 
 void ConsoleManager::initMainScreen() {
@@ -72,10 +75,15 @@ bool ConsoleManager::createDummyProcess(const std::string& processName) {
     const auto newProcess = std::make_shared<Process>(PID, processName);
     std::vector<std::shared_ptr<Instruction>> instructions;
 
-    for (int i = 0; i < 100; i++) {
-        instructions.push_back(std::make_shared<PrintInstruction>(
-            std::format("Hello world from {}!", newProcess->getName()),
-            newProcess));
+    for (int i = 0; i < 20; i++) {
+        if (i % 2 == 0) {
+            instructions.push_back(std::make_shared<PrintInstruction>(
+                std::format("Hello world from {}!", newProcess->getName()),
+                newProcess));
+        } else {
+            instructions.push_back(
+                std::make_shared<SleepInstruction>(32, newProcess));
+        }
     }
 
     newProcess->setInstructions(instructions);
