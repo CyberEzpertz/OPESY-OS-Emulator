@@ -7,10 +7,12 @@ class Process;
 class Instruction {
 protected:
     int lineCount;
-    std::shared_ptr<Process> process;
+    int pid;
+
+    std::shared_ptr<Process> getProcess() const;
 
 public:
-    explicit Instruction(int lines, std::shared_ptr<Process> process);
+    explicit Instruction(int lines, int pid);
 
     virtual ~Instruction() = default;
 
@@ -20,7 +22,12 @@ public:
     Instruction(Instruction&&) = default;
     Instruction& operator=(Instruction&&) = default;
 
+    // Instructions will generally be one-liners, except for the for loops.
+    virtual bool isComplete() const {
+        return true;
+    }
+
     virtual void execute() = 0;
 
-    [[nodiscard]] int getLineCount() const noexcept;
+    [[nodiscard]] virtual int getLineCount() const noexcept;
 };

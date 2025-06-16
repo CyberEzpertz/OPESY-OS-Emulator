@@ -11,9 +11,12 @@
 class PrintInstruction final : public Instruction {
 private:
     std::string message;
+    std::string varName;
 
 public:
-    PrintInstruction(const std::string& msg, std::shared_ptr<Process> process);
+    PrintInstruction(const std::string& msg, const int pid);
+    PrintInstruction(const std::string& msg, const int pid,
+                     const std::string& varName);
 
     void execute() override;
 

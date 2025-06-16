@@ -52,14 +52,18 @@ public:
     static void clearConsole();
 
     /// @brief Gets user input for the currently active screen.
-    void getUserInput();
+    void getUserInput() const;
 
     /// @brief Signals the program to exit.
     void exitProgram();
 
     bool getHasInitialized() const;
 
-    std::unordered_map<std::string, std::shared_ptr<Process>> getProcesses();
+    std::unordered_map<std::string, std::shared_ptr<Process>>
+    getProcessNameMap();
+
+    std::shared_ptr<Process> getProcessByPID(int processID);
+    std::vector<std::shared_ptr<Process>> getProcessIdList();
 
     void returnToMainScreen();
 
@@ -83,5 +87,8 @@ private:
     std::shared_ptr<Screen> currentScreen;
 
     /// @brief Map of available processes identified by name.
-    std::unordered_map<std::string, std::shared_ptr<Process>> processes;
+    std::unordered_map<std::string, std::shared_ptr<Process>> processNameMap;
+
+    /// @brief List of processes with the ID as the key.
+    std::vector<std::shared_ptr<Process>> processIDList;
 };

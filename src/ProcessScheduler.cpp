@@ -1,6 +1,7 @@
 #include "ProcessScheduler.h"
 
 #include <chrono>
+#include <print>
 #include <thread>
 
 #include "Process.h"
@@ -49,7 +50,7 @@ void ProcessScheduler::start() {
 void ProcessScheduler::stop() {
     running = false;
     tickCv.notify_all();
-    queueCv.notify_all();
+    readyCv.notify_all();
 }
 
 int ProcessScheduler::getNumAvailableCores() const {
@@ -68,16 +69,23 @@ void ProcessScheduler::initialize() {
 void ProcessScheduler::scheduleProcess(
     const std::shared_ptr<Process>& process) {
     {
-        std::lock_guard<std::mutex> lock(queueMutex);
-        processQueue.push_back(process);
+        std::lock_guard<std::mutex> lock(readyMutex);
+        readyQueue.push_back(process);
     }
 
     // Wake one worker in case they were waiting for work
-    queueCv.notify_one();
+    readyCv.notify_one();
 }
 
 void ProcessScheduler::sortQueue() {
     // TODO: Implement this when needed
+}
+
+void ProcessScheduler::sleepProcess(const std::shared_ptr<Process>& process) {
+    {
+        std::lock_guard lock(waitMutex);
+        this->waitQueue.push(process);
+    }
 }
 
 uint64_t ProcessScheduler::getCurrentCycle() const {
@@ -86,38 +94,62 @@ uint64_t ProcessScheduler::getCurrentCycle() const {
 
 void ProcessScheduler::incrementCpuCycles() {
     {
-        std::lock_guard<std::mutex> lock(tickMutex);
+        std::lock_guard lock(tickMutex);
         ++cpuCycles;
-
-        // if (processQueue.empty() && availableCores.load() == numCpuCores) {
-        //     running = false;
-        // }
     }
+
+    // Wakeup all sleeping processes that need to wakeup
+    // NOTE: This should be put before tickCv, otherwise the cores might not be
+    // able to get the recently woken up processes
+    {
+        std::lock_guard lock(waitMutex);
+
+        while (!waitQueue.empty() &&
+               waitQueue.top()->getWakeupTick() <= cpuCycles) {
+            auto proc = waitQueue.top();
+            waitQueue.pop();
+
+            if (!proc)
+                continue;  // skip nulls
+
+            if (proc->getIsFinished()) {
+                proc->setStatus(DONE);
+            } else {
+                proc->setStatus(READY);
+                scheduleProcess(proc);
+            }
+        }
+    }
+
     tickCv.notify_all();  // Notify all worker threads that a new tick occurred
+}
+
+void ProcessScheduler::printQueues() const {
+    std::println("Ready queue: {}", this->readyQueue.size());
+    std::println("Waiting queue: {}", this->waitQueue.size());
 }
 
 void ProcessScheduler::tickLoop() {
     while (running) {
-        std::this_thread::sleep_for(10ms);  // Simulate one tick every 50ms
+        // std::this_thread::sleep_for(1ms);  // Simulate one tick every 50ms
         incrementCpuCycles();
     }
 }
 
-void ProcessScheduler::workerLoop(int coreId) {
+void ProcessScheduler::workerLoop(const int coreId) {
     uint64_t lastTickSeen = 0;
     std::shared_ptr<Process> proc = nullptr;
 
     while (running) {
         // Get a process from the queue
         {
-            std::unique_lock<std::mutex> lock(queueMutex);
+            std::unique_lock<std::mutex> lock(readyMutex);
 
-            queueCv.wait(lock,
-                         [&] { return !processQueue.empty() || !running; });
+            readyCv.wait(lock, [&] { return !readyQueue.empty() || !running; });
 
-            if (!processQueue.empty()) {
-                proc = processQueue.front();
-                processQueue.pop_front();
+            if (!readyQueue.empty()) {
+                proc = readyQueue.front();
+                readyQueue.pop_front();
 
                 proc->setStatus(RUNNING);
                 proc->setCurrentCore(coreId);
@@ -126,7 +158,7 @@ void ProcessScheduler::workerLoop(int coreId) {
         }
 
         // NOTE: This is only for FCFS, RR will be implemented in the future
-        while (proc && proc->getStatus() != DONE) {
+        while (proc && proc->getStatus() == RUNNING) {
             // Wait for next tick before executing next instruction
             {
                 std::unique_lock<std::mutex> lock(tickMutex);
@@ -145,7 +177,6 @@ void ProcessScheduler::workerLoop(int coreId) {
         if (proc) {
             proc->setCurrentCore(-1);
             proc = nullptr;
-
             availableCores += 1;
         }
     }

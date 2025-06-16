@@ -189,7 +189,7 @@ void MainScreen::printProcessReport() {
     double cpuUtil =
         static_cast<double>(numCores - availableCores) / numCores * 100.0;
 
-    auto processes = ConsoleManager::getInstance().getProcesses();
+    auto processes = ConsoleManager::getInstance().getProcessNameMap();
 
     std::vector<std::shared_ptr<Process>> sorted;
 
@@ -207,10 +207,26 @@ void MainScreen::printProcessReport() {
     std::println("Total Cores: {}", numCores);
 
     std::println("{:->30}", "");
+
+    std::println("Waiting Processes");
+
+    for (const auto& process : sorted) {
+        if (process->getStatus() == WAITING) {
+            std::string coreStr =
+                (process->getCurrentCore() == -1)
+                    ? "N/A"
+                    : std::to_string(process->getCurrentCore());
+
+            std::println("{:<10}\t({:<8})\tCore:\t{:<4}\t{} / {}",
+                         process->getName(), process->getTimestamp(), coreStr,
+                         process->getCurrentLine(), process->getTotalLines());
+        }
+    }
+
     std::println("Running processes:");
 
     for (const auto& process : sorted) {
-        if (process->getStatus() != DONE) {
+        if (process->getStatus() != DONE && process->getStatus() != WAITING) {
             std::string coreStr =
                 (process->getCurrentCore() == -1)
                     ? "N/A"

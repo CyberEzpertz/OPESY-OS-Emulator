@@ -12,9 +12,19 @@
 #include <iostream>
 #include <sstream>
 
-Process::Process(int id, std::string name)
-    : processID(id), currentLine(0), status(READY), processName(name) {
-    totalLines = instructions.size();
+Process::Process(const int id, const std::string& name)
+    : processID(id),
+      processName(name),
+      currentLine(0),
+      currentInstructionIndex(0),
+      status(READY),
+      currentCore(-1),
+      wakeupTick(0) {
+    totalLines = 0;
+    for (const auto& instr : instructions) {
+        totalLines += instr->getLineCount();
+    }
+
     timestamp = generateTimestamp();
 }
 /**
@@ -79,25 +89,28 @@ void Process::log(const std::string& entry) {
  */
 void Process::incrementLine() {
     if (currentLine < totalLines) {
-        instructions[currentLine]->execute();
-
+        instructions[currentInstructionIndex]->execute();
         currentLine++;
-        if (currentLine >= totalLines) {
-            this->status = DONE;
-            writeLogToFile();
-        }
+
+        if (instructions[currentInstructionIndex]->isComplete())
+            currentInstructionIndex++;
+    }
+
+    if (currentLine >= totalLines) {
+        this->status = DONE;
+        writeLogToFile();
     }
 }
 
 ProcessStatus Process::getStatus() const {
-    return status;
+    return status.load();
 }
 
 void Process::setStatus(const ProcessStatus newStatus) {
     this->status = newStatus;
 }
 
-void Process::setCurrentCore(int coreId) {
+void Process::setCurrentCore(const int coreId) {
     currentCore = coreId;
 }
 int Process::getCurrentCore() const {
@@ -106,7 +119,33 @@ int Process::getCurrentCore() const {
 void Process::setInstructions(
     const std::vector<std::shared_ptr<Instruction>>& instructions) {
     this->instructions = instructions;
-    this->totalLines = instructions.size();
+    this->totalLines = 0;
+
+    for (const auto& instr : instructions) {
+        this->totalLines += instr->getLineCount();
+    }
+}
+void Process::setVariable(const std::string& name, const uint16_t value) {
+    variables[name] = value;
+}
+
+bool Process::getIsFinished() const {
+    return currentLine >= totalLines;
+}
+
+uint16_t Process::getVariable(const std::string& name) {
+    // If it doesn't exist, should be default value of 0
+    if (!variables.contains(name)) {
+        variables[name] = 0;
+    }
+
+    return variables[name];
+}
+uint64_t Process::getWakeupTick() const {
+    return wakeupTick;
+}
+void Process::setWakeupTick(const uint64_t value) {
+    this->wakeupTick = value;
 }
 
 /**
