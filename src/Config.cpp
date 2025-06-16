@@ -13,10 +13,6 @@ std::string stripQuotes(const std::string& input) {
     return input;
 }
 
-Config::Config() {
-    this->loadFromFile();
-}
-
 Config& Config::getInstance() {
     static Config instance;
 

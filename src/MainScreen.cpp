@@ -49,6 +49,7 @@ void MainScreen::render() {
 /// - "clear": Clears the console screen and prints the header.
 /// - "screen -s <name>": Placeholder for creating a new screen.
 /// - "screen -r <name>": Placeholder for resuming a screen.
+/// - "screen -ls": Displays the processes
 /// - "scheduler-test", "scheduler-stop", "report-util", "initialize":
 /// Placeholders for other commands.
 ///
@@ -73,10 +74,22 @@ void MainScreen::handleUserInput() {
     const std::string& cmd = tokens[0];
     ConsoleManager& console = ConsoleManager::getInstance();
 
+    if (!console.getHasInitialized()) {
+        if (cmd == "exit") {
+            console.exitProgram();
+        } else if (cmd == "initialize") {
+            console.initialize();
+        } else {
+            std::println("Error: Program has not been initialized. Please type "
+                         "\"initialize\" before proceeding.");
+        }
+        return;
+    }
+
     if (cmd == "exit") {
         console.exitProgram();  // Trigger outer loop exit
     } else if (cmd == "clear") {
-        console.clearConsole();
+        ConsoleManager::clearConsole();
         render();
     } else if (cmd == "screen") {
         if (tokens.size() < 3) {

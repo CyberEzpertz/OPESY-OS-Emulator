@@ -30,7 +30,7 @@ public:
 
 private:
     // Private constructor to prevent instantiation
-    Config();
+    Config() = default;
 
     // Default values from the specs
     int numCPUs = 4;

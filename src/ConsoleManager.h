@@ -56,6 +56,8 @@ public:
     /// @brief Signals the program to exit.
     void exitProgram();
 
+    bool getHasInitialized() const;
+
     std::unordered_map<std::string, std::shared_ptr<Process>> getProcesses();
 
     void returnToMainScreen();
@@ -64,8 +66,11 @@ private:
     /// @brief Flag to indicate if the program should exit.
     bool hasExited = false;
 
+    /// @brief Flag to indicate if the program has been initialized.
+    bool hasInitialized = false;
+
     /// @brief Private constructor to enforce singleton pattern.
-    ConsoleManager() = default;
+    ConsoleManager();
 
     /// @brief Renders the currently active screen.
     ///

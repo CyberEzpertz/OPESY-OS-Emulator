@@ -20,7 +20,7 @@ public:
     void stop();
     int getNumAvailableCores() const;
     int getNumTotalCores() const;
-    void initialize(int numCores);  // TODO
+    void initialize();
     void scheduleProcess(const std::shared_ptr<Process>& process);
     void sortQueue();  // FCFS only
     uint64_t getCurrentCycle() const;
