@@ -6,6 +6,7 @@
 #include <thread>
 
 #include "Process.h"
+#include "ConsoleManager.h"
 
 using namespace std::chrono_literals;
 
@@ -21,12 +22,17 @@ ProcessScheduler::ProcessScheduler() {
 
 ProcessScheduler::~ProcessScheduler() {
     running = false;
+    generatingDummies = false;
 
     // Wake all threads
     tickCv.notify_all();
 
     if (tickThread.joinable()) {
         tickThread.join();
+    }
+
+    if (dummyGeneratorThread.joinable()) {
+        dummyGeneratorThread.join();
     }
 
     for (auto& t : cpuWorkers) {
@@ -50,6 +56,7 @@ void ProcessScheduler::start() {
 
 void ProcessScheduler::stop() {
     running = false;
+    generatingDummies = false;
     tickCv.notify_all();
     readyCv.notify_all();
 }
@@ -125,6 +132,65 @@ void ProcessScheduler::incrementCpuCycles() {
     tickCv.notify_all();  // Notify all worker threads that a new tick occurred
 }
 
+void ProcessScheduler::startDummyGeneration() {
+    if (generatingDummies.load()) {
+        std::println("Dummy process generation is already running.");
+        return;
+    }
+
+    generatingDummies = true;
+    dummyGeneratorThread = std::thread(&ProcessScheduler::dummyGeneratorLoop, this);
+    std::println("Started dummy process generation every {} CPU cycles.",
+                 Config::getInstance().getBatchProcessFreq());
+}
+
+void ProcessScheduler::stopDummyGeneration() {
+    if (!generatingDummies.exchange(false)) {
+        std::println("Dummy process generation is not currently running.");
+        return;
+    }
+    tickCv.notify_all();               // wake the loop above
+
+    if (dummyGeneratorThread.joinable())
+        dummyGeneratorThread.join();
+
+    std::println("Stopped dummy process generation.");
+}
+
+
+void ProcessScheduler::dummyGeneratorLoop() {
+    const int  interval   = Config::getInstance().getBatchProcessFreq();
+    uint64_t   lastCycle  = getCurrentCycle();
+
+    while (generatingDummies.load()) {
+        // wait until either: (a) we’re told to stop, or (b) enough ticks passed
+        std::unique_lock<std::mutex> lock(tickMutex);
+        tickCv.wait(lock, [&] {
+            return !generatingDummies.load()
+                   || (getCurrentCycle() - lastCycle) >= interval;
+        });
+        lock.unlock();                       // don’t hold tickMutex any longer
+
+        if (!generatingDummies.load()) break;
+        if ((getCurrentCycle() - lastCycle) < interval) continue;
+
+        lastCycle = getCurrentCycle();       // time for a new batch!
+
+        int         id   = dummyProcessCounter.fetch_add(1);
+        std::string name = std::format("p{:02d}", id);
+
+        if (ConsoleManager::getInstance().createDummyProcess(name))
+            std::println("Generated dummy process: {}", name);
+        else
+            std::println("Failed to generate dummy process: {}", name);
+    }
+}
+
+
+bool ProcessScheduler::isGeneratingDummies() const {
+    return generatingDummies.load();
+}
+
 void ProcessScheduler::printQueues() const {
     std::println("Ready queue: {}", this->readyQueue.size());
     std::println("Waiting queue: {}", this->waitQueue.size());
@@ -193,6 +259,8 @@ void ProcessScheduler::workerLoop(const int coreId){
 
             readyCv.wait(lock, [&] { return !readyQueue.empty() || !running; });
 
+            if (!running) break;
+
             if (!readyQueue.empty()) {
                 proc = readyQueue.front();
                 readyQueue.pop_front();
@@ -211,6 +279,7 @@ void ProcessScheduler::workerLoop(const int coreId){
         } else if (schedulerType == SchedulerType::RR) {
             executeRR(proc, lastTickSeen);
         }
+
 
         // Reset current core to none
         if (proc) {

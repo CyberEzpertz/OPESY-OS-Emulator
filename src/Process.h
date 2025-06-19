@@ -92,6 +92,9 @@ public:
     uint16_t getVariable(const std::string& name);
     uint64_t getWakeupTick() const;
     void setWakeupTick(const uint64_t value);
+    void setLastInstructionCycle(uint64_t cycle) { lastInstructionCycle = cycle; }
+    uint64_t getLastInstructionCycle() const { return lastInstructionCycle; }
+
 
 private:
     int processID;                  ///< Unique identifier for the process.
@@ -107,6 +110,8 @@ private:
     std::vector<std::shared_ptr<Instruction>> instructions;
     std::unordered_map<std::string, uint16_t> variables;
     uint64_t wakeupTick;
+    uint64_t lastInstructionCycle = 0;
+
 
     /**
      * @brief Generates a formatted timestamp for the process creation time.

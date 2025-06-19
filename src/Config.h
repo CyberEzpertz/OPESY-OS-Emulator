@@ -17,8 +17,9 @@ public:
     Config& operator=(const Config&) = delete;
     Config& operator=(Config&&) = delete;
 
-    bool loadFromFile();
 
+    bool loadFromFile();
+    [[nodiscard]] int getDelayPerExec() const;
     [[nodiscard]] int getNumCPUs() const;
     [[nodiscard]] SchedulerType getSchedulerType() const;
     [[nodiscard]] uint32_t getQuantumCycles() const;
@@ -33,6 +34,7 @@ private:
     Config() = default;
 
     // Default values from the specs
+    int delayPerExec = 1;  // Default value if not set in config
     int numCPUs = 4;
     SchedulerType scheduler = SchedulerType::RR;
     uint32_t quantumCycles = 5;
