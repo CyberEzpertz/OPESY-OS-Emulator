@@ -113,9 +113,31 @@ void MainScreen::handleUserInput() {
         handleScreenCommand(tokens);
     } else if (cmd == "initialize") {
         std::println("Program has already been initialized.");
-    } else if (cmd == "scheduler-test" || cmd == "scheduler-stop" ||
-               cmd == "report-util") {
-        printPlaceholder(cmd);
+    } else if (cmd == "scheduler-test") {
+        ProcessScheduler& scheduler = ProcessScheduler::getInstance();
+        if (scheduler.isGeneratingDummies()) {
+            std::println("Dummy process generation is already running.");
+            std::println("Use 'scheduler-stop' to stop it first.");
+        } else {
+            scheduler.startDummyGeneration();
+        }
+    } else if (cmd == "scheduler-stop") {
+        ProcessScheduler& scheduler = ProcessScheduler::getInstance();
+        if (!scheduler.isGeneratingDummies()) {
+            std::println("Dummy process generation is not currently running.");
+        } else {
+            scheduler.stopDummyGeneration();
+        }
+    } else if (cmd == "scheduler-status") {
+        // Optional: Add a status command for debugging
+        ProcessScheduler& scheduler = ProcessScheduler::getInstance();
+        std::println("Scheduler Status:");
+        std::println("- CPU Cycles: {}", scheduler.getCurrentCycle());
+        std::println("- Dummy Generation: {}",
+                     scheduler.isGeneratingDummies() ? "Running" : "Stopped");
+        std::println("- Available Cores: {}/{}",
+                     scheduler.getNumAvailableCores(), scheduler.getNumTotalCores());
+        scheduler.printQueues();
     } else {
         std::println("Error: Unknown command {}", cmd);
     }

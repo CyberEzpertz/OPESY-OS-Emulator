@@ -11,6 +11,7 @@
 
 #include "Config.h"
 #include "Process.h"
+#include "ConsoleManager.h"
 
 // For the min-heap waiting queue
 struct WakeupComparator {
@@ -21,6 +22,7 @@ struct WakeupComparator {
 };
 
 class ProcessScheduler {
+
 public:
     static ProcessScheduler& getInstance();
 
@@ -34,6 +36,10 @@ public:
     void sleepProcess(const std::shared_ptr<Process>& process);
     uint64_t getCurrentCycle() const;
     void printQueues() const;
+    void startDummyGeneration();
+    void stopDummyGeneration();
+    bool isGeneratingDummies() const;
+
 
 private:
     ProcessScheduler();
@@ -45,6 +51,7 @@ private:
     void tickLoop();
     void workerLoop(int coreId);
     void incrementCpuCycles();
+    void dummyGeneratorLoop();
 
     int numCpuCores;
     std::atomic<int> availableCores;
@@ -67,6 +74,10 @@ private:
     std::vector<std::thread> cpuWorkers;
     std::atomic<uint64_t> cpuCycles{0};
     std::atomic<bool> running{false};
+
+    std::thread dummyGeneratorThread;
+    std::atomic<bool> generatingDummies{false};
+    std::atomic<int> dummyProcessCounter{1}; // Start from 1 for p01, p02, etc.
 
     std::thread tickThread;
 };
