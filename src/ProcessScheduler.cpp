@@ -206,7 +206,6 @@ void ProcessScheduler::workerLoop(const int coreId) {
     uint64_t lastTickSeen = 0;
     std::shared_ptr<Process> proc = nullptr;
 
-    const int delay = Config::getInstance().getDelaysPerExec();
 
     while (running) {
         // Get a process from the queue
@@ -215,30 +214,25 @@ void ProcessScheduler::workerLoop(const int coreId) {
 
             readyCv.wait(lock, [&] { return !readyQueue.empty() || !running; });
 
-            if (!running) break;
-
             if (!readyQueue.empty()) {
                 proc = readyQueue.front();
                 readyQueue.pop_front();
 
                 proc->setStatus(RUNNING);
                 proc->setCurrentCore(coreId);
-                proc->setLastInstructionCycle(cpuCycles);  // ← prevent immediate execution
+
                 availableCores -= 1;
             }
         }
 
         while (proc && proc->getStatus() == RUNNING && running) {
+            {
             std::unique_lock<std::mutex> lock(tickMutex);
             tickCv.wait(lock, [&] { return cpuCycles > lastTickSeen || !running; });
             if (!running) break;
             lastTickSeen = cpuCycles;
-
-            // Only execute if delay cycles have passed
-            if ((cpuCycles - proc->getLastInstructionCycle()) >= delay) {
-                proc->incrementLine();
-                proc->setLastInstructionCycle(cpuCycles);
             }
+            proc->incrementLine();
         }
 
 
