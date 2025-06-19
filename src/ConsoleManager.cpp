@@ -39,10 +39,14 @@ ConsoleManager& ConsoleManager::getInstance() {
 /// Logs an error message if the screen name is not found.
 void ConsoleManager::switchConsole(const std::string& processName) {
     if (processNameMap.contains(processName)) {
-        currentScreen =
-            std::make_shared<ProcessScreen>(processNameMap[processName]);
-        clearConsole();
-        currentScreen->render();
+        if (processNameMap[processName]->getStatus() == ProcessStatus::DONE) {
+            std::println("Process {} not found.", processName);
+        } else {
+            currentScreen =
+                std::make_shared<ProcessScreen>(processNameMap[processName]);
+            clearConsole();
+            currentScreen->render();
+        }
     } else {
         std::println("Error: No process named {} was found.", processName);
     }
