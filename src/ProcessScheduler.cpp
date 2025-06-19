@@ -1,6 +1,7 @@
 #include "ProcessScheduler.h"
 
 #include <chrono>
+#include <iostream>
 #include <print>
 #include <thread>
 
@@ -131,15 +132,60 @@ void ProcessScheduler::printQueues() const {
 
 void ProcessScheduler::tickLoop() {
     while (running) {
-        // std::this_thread::sleep_for(1ms);  // Simulate one tick every 50ms
+        // std::this_thread::sleep_for(1000ms);  // Simulate one tick every 50ms
         incrementCpuCycles();
     }
 }
 
-void ProcessScheduler::workerLoop(const int coreId) {
+void ProcessScheduler::executeFCFS(std::shared_ptr<Process>& proc, uint64_t& lastTickSeen) {
+    // FCFS: Run until process is finished or blocked
+    while (proc && proc->getStatus() == RUNNING) {
+        // Wait for next tick before executing next instruction
+        {
+            std::unique_lock<std::mutex> lock(tickMutex);
+            tickCv.wait(
+                lock, [&] { return cpuCycles > lastTickSeen || !running; });
+
+            if (!running)
+                break;
+            lastTickSeen = cpuCycles;
+        }
+
+        proc->incrementLine();
+    }
+}
+
+void ProcessScheduler::executeRR(std::shared_ptr<Process>& proc, uint64_t& lastTickSeen) {
+    // Round Robin: Run for quantum cycles or until finished/blocked
+    uint32_t cyclesExecuted = 0;
+    const auto quantumCycles = Config::getInstance().getQuantumCycles();
+    while (proc && proc->getStatus() == RUNNING && cyclesExecuted < quantumCycles) {
+        // Wait for next tick before executing next instruction
+        {
+            std::unique_lock<std::mutex> lock(tickMutex);
+            tickCv.wait(
+                lock, [&] { return cpuCycles > lastTickSeen || !running; });
+
+            if (!running)
+                break;
+            lastTickSeen = cpuCycles;
+        }
+
+        proc->incrementLine();
+        cyclesExecuted++;
+    }
+
+    // If process used full quantum and is still running, preempt it
+    if (proc && proc->getStatus() == RUNNING && cyclesExecuted >= quantumCycles) {
+        proc->setStatus(READY);
+        scheduleProcess(proc);  // Put back at end of ready queue
+    }
+}
+
+void ProcessScheduler::workerLoop(const int coreId){
     uint64_t lastTickSeen = 0;
     std::shared_ptr<Process> proc = nullptr;
-
+    auto schedulerType = Config::getInstance().getSchedulerType();
     while (running) {
         // Get a process from the queue
         {
@@ -157,20 +203,13 @@ void ProcessScheduler::workerLoop(const int coreId) {
             }
         }
 
-        // NOTE: This is only for FCFS, RR will be implemented in the future
-        while (proc && proc->getStatus() == RUNNING) {
-            // Wait for next tick before executing next instruction
-            {
-                std::unique_lock<std::mutex> lock(tickMutex);
-                tickCv.wait(
-                    lock, [&] { return cpuCycles > lastTickSeen || !running; });
+        if (!proc) continue;
 
-                if (!running)
-                    break;
-                lastTickSeen = cpuCycles;
-            }
-
-            proc->incrementLine();
+        // Execute process based on scheduler type
+        if (schedulerType == SchedulerType::FCFS) {
+            executeFCFS(proc, lastTickSeen);
+        } else if (schedulerType == SchedulerType::RR) {
+            executeRR(proc, lastTickSeen);
         }
 
         // Reset current core to none
