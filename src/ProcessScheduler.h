@@ -45,12 +45,11 @@ private:
     void tickLoop();
     void workerLoop(int coreId);
     void incrementCpuCycles();
+    void executeFCFS(std::shared_ptr<Process>& proc, uint64_t& lastTickSeen);
+    void executeRR(std::shared_ptr<Process>& proc, uint64_t& lastTickSeen);
 
     int numCpuCores;
     std::atomic<int> availableCores;
-
-    SchedulerType schedulerType = SchedulerType::FCFS;
-    uint32_t quantumCycles = 1;
 
     std::deque<std::shared_ptr<Process>> readyQueue;
     std::condition_variable readyCv;
