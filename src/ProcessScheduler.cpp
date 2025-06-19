@@ -176,7 +176,7 @@ void ProcessScheduler::dummyGeneratorLoop() {
         lastCycle = getCurrentCycle();       // time for a new batch!
 
         int         id   = dummyProcessCounter.fetch_add(1);
-        std::string name = std::format("p{:02d}", id);
+        std::string name = std::format("process{:02d}", id);
 
         if (ConsoleManager::getInstance().createDummyProcess(name))
             std::println("Generated dummy process: {}", name);
