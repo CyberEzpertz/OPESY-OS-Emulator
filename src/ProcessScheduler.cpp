@@ -252,6 +252,7 @@ void ProcessScheduler::workerLoop(const int coreId){
     uint64_t lastTickSeen = 0;
     std::shared_ptr<Process> proc = nullptr;
     auto schedulerType = Config::getInstance().getSchedulerType();
+
     while (running) {
         // Get a process from the queue
         {
