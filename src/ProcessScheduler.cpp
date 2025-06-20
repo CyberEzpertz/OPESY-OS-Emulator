@@ -198,7 +198,7 @@ void ProcessScheduler::printQueues() const {
 
 void ProcessScheduler::tickLoop() {
     while (running) {
-        // std::this_thread::sleep_for(1000ms);  // Simulate one tick every 50ms
+        // std::this_thread::sleep_for(1ms);  // Simulate one tick every 50ms
         incrementCpuCycles();
     }
 }
@@ -280,7 +280,6 @@ void ProcessScheduler::workerLoop(const int coreId){
         } else if (schedulerType == SchedulerType::RR) {
             executeRR(proc, lastTickSeen);
         }
-
 
         // Reset current core to none
         if (proc) {
