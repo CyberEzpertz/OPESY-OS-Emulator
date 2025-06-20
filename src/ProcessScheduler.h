@@ -11,7 +11,6 @@
 
 #include "Config.h"
 #include "Process.h"
-#include "ConsoleManager.h"
 
 // For the min-heap waiting queue
 struct WakeupComparator {
@@ -38,7 +37,6 @@ public:
     void startDummyGeneration();
     void stopDummyGeneration();
     bool isGeneratingDummies() const;
-
 
 private:
     ProcessScheduler();
@@ -75,7 +73,6 @@ private:
 
     std::thread dummyGeneratorThread;
     std::atomic<bool> generatingDummies{false};
-    std::atomic<int> dummyProcessCounter{1}; // Start from 1 for p01, p02, etc.
 
     std::thread tickThread;
 };

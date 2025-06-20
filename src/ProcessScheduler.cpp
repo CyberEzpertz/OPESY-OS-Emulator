@@ -61,7 +61,7 @@ void ProcessScheduler::stop() {
 }
 
 int ProcessScheduler::getNumAvailableCores() const {
-    return availableCores.load();
+    return availableCores;
 }
 
 int ProcessScheduler::getNumTotalCores() const {
@@ -76,7 +76,7 @@ void ProcessScheduler::initialize() {
 void ProcessScheduler::scheduleProcess(
     const std::shared_ptr<Process>& process) {
     {
-        std::lock_guard<std::mutex> lock(readyMutex);
+        std::lock_guard lock(readyMutex);
         readyQueue.push_back(process);
     }
 
@@ -96,7 +96,7 @@ void ProcessScheduler::sleepProcess(const std::shared_ptr<Process>& process) {
 }
 
 uint64_t ProcessScheduler::getCurrentCycle() const {
-    return cpuCycles.load();
+    return cpuCycles;
 }
 
 void ProcessScheduler::incrementCpuCycles() {
@@ -132,7 +132,7 @@ void ProcessScheduler::incrementCpuCycles() {
 }
 
 void ProcessScheduler::startDummyGeneration() {
-    if (generatingDummies.load()) {
+    if (generatingDummies) {
         std::println("Dummy process generation is already running.");
         return;
     }
@@ -161,34 +161,32 @@ void ProcessScheduler::dummyGeneratorLoop() {
     const int interval = Config::getInstance().getBatchProcessFreq();
     uint64_t lastCycle = getCurrentCycle();
 
-    while (generatingDummies.load()) {
+    while (generatingDummies) {
         // wait until either: (a) we’re told to stop, or (b) enough ticks passed
-        std::unique_lock<std::mutex> lock(tickMutex);
-        tickCv.wait(lock, [&] {
-            return !generatingDummies.load() ||
-                   (getCurrentCycle() - lastCycle) >= interval;
-        });
-        lock.unlock();  // don’t hold tickMutex any longer
+        {
+            std::unique_lock lock(tickMutex);
+            tickCv.wait(lock, [&] {
+                return !generatingDummies ||
+                       (getCurrentCycle() - lastCycle) >= interval;
+            });
+        }
 
-        if (!generatingDummies.load())
+        if (!generatingDummies)
             break;
         if ((getCurrentCycle() - lastCycle) < interval)
             continue;
 
         lastCycle = getCurrentCycle();  // time for a new batch!
 
-        int id = dummyProcessCounter.fetch_add(1);
+        int id = ConsoleManager::getInstance().getProcessIdList().size();
         std::string name = std::format("process_{:02d}", id);
 
-        if (ConsoleManager::getInstance().createDummyProcess(name))
-            std::println("Generated dummy process: {}", name);
-        else
-            std::println("Failed to generate dummy process: {}", name);
+        ConsoleManager::getInstance().createDummyProcess(name);
     }
 }
 
 bool ProcessScheduler::isGeneratingDummies() const {
-    return generatingDummies.load();
+    return generatingDummies;
 }
 
 void ProcessScheduler::printQueues() const {
@@ -209,7 +207,7 @@ void ProcessScheduler::executeFCFS(std::shared_ptr<Process>& proc,
     while (proc && proc->getStatus() == RUNNING) {
         // Wait for next tick before executing next instruction
         {
-            std::unique_lock<std::mutex> lock(tickMutex);
+            std::unique_lock lock(tickMutex);
             tickCv.wait(lock,
                         [&] { return cpuCycles > lastTickSeen || !running; });
 
@@ -231,7 +229,7 @@ void ProcessScheduler::executeRR(std::shared_ptr<Process>& proc,
            cyclesExecuted < quantumCycles) {
         // Wait for next tick before executing next instruction
         {
-            std::unique_lock<std::mutex> lock(tickMutex);
+            std::unique_lock lock(tickMutex);
             tickCv.wait(lock,
                         [&] { return cpuCycles > lastTickSeen || !running; });
 
@@ -255,12 +253,12 @@ void ProcessScheduler::executeRR(std::shared_ptr<Process>& proc,
 void ProcessScheduler::workerLoop(const int coreId) {
     uint64_t lastTickSeen = 0;
     std::shared_ptr<Process> proc = nullptr;
-    auto schedulerType = Config::getInstance().getSchedulerType();
+    const auto schedulerType = Config::getInstance().getSchedulerType();
 
     while (running) {
         // Get a process from the queue
         {
-            std::unique_lock<std::mutex> lock(readyMutex);
+            std::unique_lock lock(readyMutex);
 
             readyCv.wait(lock, [&] { return !readyQueue.empty() || !running; });
 
