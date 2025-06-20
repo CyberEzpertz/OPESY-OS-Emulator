@@ -13,7 +13,6 @@ void ConsoleManager::initialize() {
     hasInitialized = true;
     Config::getInstance().loadFromFile();
     ProcessScheduler::getInstance().initialize();
-    createDummies(10);
     ProcessScheduler::getInstance().start();
 
     // NOTE: This is for debugging only.
@@ -61,6 +60,7 @@ bool ConsoleManager::createProcess(const std::string& processName) {
         return false;
     }
 
+    std::unique_lock lock(processListMutex);
     const int PID = processIDList.size();
 
     const auto newProcess = std::make_shared<Process>(PID, processName);
@@ -79,6 +79,7 @@ bool ConsoleManager::createDummyProcess(const std::string& processName) {
         return false;
     }
 
+    std::unique_lock lock(processListMutex);
     const int PID = processNameMap.size();
 
     const auto newProcess = std::make_shared<Process>(PID, processName);
@@ -89,7 +90,6 @@ bool ConsoleManager::createDummyProcess(const std::string& processName) {
         InstructionFactory::generateInstructions(PID);
 
     newProcess->setInstructions(instructions);
-
     ProcessScheduler::getInstance().scheduleProcess(newProcess);
 
     return true;
@@ -131,9 +131,13 @@ bool ConsoleManager::getHasInitialized() const {
 }
 std::unordered_map<std::string, std::shared_ptr<Process>>
 ConsoleManager::getProcessNameMap() {
+    std::shared_lock lock(processListMutex);
     return processNameMap;
 }
+
 std::shared_ptr<Process> ConsoleManager::getProcessByPID(const int processID) {
+    std::shared_lock lock(processListMutex);
+
     if (processID >= processIDList.size()) {
         return nullptr;
     }
@@ -142,6 +146,8 @@ std::shared_ptr<Process> ConsoleManager::getProcessByPID(const int processID) {
 }
 
 std::vector<std::shared_ptr<Process>> ConsoleManager::getProcessIdList() {
+    std::shared_lock lock(processListMutex);
+
     return processIDList;
 }
 

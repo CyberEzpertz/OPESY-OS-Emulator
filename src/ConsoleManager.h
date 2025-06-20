@@ -2,6 +2,7 @@
 
 #include <any>
 #include <memory>
+#include <shared_mutex>
 #include <string>
 #include <unordered_map>
 
@@ -91,4 +92,6 @@ private:
 
     /// @brief List of processes with the ID as the key.
     std::vector<std::shared_ptr<Process>> processIDList;
+
+    std::shared_mutex processListMutex;
 };
