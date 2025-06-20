@@ -1,6 +1,7 @@
 #include "InstructionFactory.h"
 
 #include <cstdlib>
+#include <format>
 #include <memory>
 #include <random>
 #include <set>

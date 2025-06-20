@@ -99,6 +99,7 @@ void Process::incrementLine() {
     if (currentLine >= totalLines) {
         this->status = DONE;
         writeLogToFile();
+        instructions.clear();
     }
 }
 
