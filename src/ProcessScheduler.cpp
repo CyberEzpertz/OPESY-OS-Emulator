@@ -1,12 +1,11 @@
 #include "ProcessScheduler.h"
 
 #include <chrono>
-#include <iostream>
 #include <print>
 #include <thread>
 
-#include "Process.h"
 #include "ConsoleManager.h"
+#include "Process.h"
 
 using namespace std::chrono_literals;
 
@@ -62,7 +61,7 @@ void ProcessScheduler::stop() {
 }
 
 int ProcessScheduler::getNumAvailableCores() const {
-    return availableCores.load();
+    return availableCores;
 }
 
 int ProcessScheduler::getNumTotalCores() const {
@@ -77,7 +76,7 @@ void ProcessScheduler::initialize() {
 void ProcessScheduler::scheduleProcess(
     const std::shared_ptr<Process>& process) {
     {
-        std::lock_guard<std::mutex> lock(readyMutex);
+        std::lock_guard lock(readyMutex);
         readyQueue.push_back(process);
     }
 
@@ -97,7 +96,7 @@ void ProcessScheduler::sleepProcess(const std::shared_ptr<Process>& process) {
 }
 
 uint64_t ProcessScheduler::getCurrentCycle() const {
-    return cpuCycles.load();
+    return cpuCycles;
 }
 
 void ProcessScheduler::incrementCpuCycles() {
@@ -133,13 +132,14 @@ void ProcessScheduler::incrementCpuCycles() {
 }
 
 void ProcessScheduler::startDummyGeneration() {
-    if (generatingDummies.load()) {
+    if (generatingDummies) {
         std::println("Dummy process generation is already running.");
         return;
     }
 
     generatingDummies = true;
-    dummyGeneratorThread = std::thread(&ProcessScheduler::dummyGeneratorLoop, this);
+    dummyGeneratorThread =
+        std::thread(&ProcessScheduler::dummyGeneratorLoop, this);
     std::println("Started dummy process generation every {} CPU cycles.",
                  Config::getInstance().getBatchProcessFreq());
 }
@@ -149,7 +149,7 @@ void ProcessScheduler::stopDummyGeneration() {
         std::println("Dummy process generation is not currently running.");
         return;
     }
-    tickCv.notify_all();               // wake the loop above
+    tickCv.notify_all();  // wake the loop above
 
     if (dummyGeneratorThread.joinable())
         dummyGeneratorThread.join();
@@ -157,38 +157,36 @@ void ProcessScheduler::stopDummyGeneration() {
     std::println("Stopped dummy process generation.");
 }
 
-
 void ProcessScheduler::dummyGeneratorLoop() {
-    const int  interval   = Config::getInstance().getBatchProcessFreq();
-    uint64_t   lastCycle  = getCurrentCycle();
+    const int interval = Config::getInstance().getBatchProcessFreq();
+    uint64_t lastCycle = getCurrentCycle();
 
-    while (generatingDummies.load()) {
+    while (generatingDummies) {
         // wait until either: (a) we’re told to stop, or (b) enough ticks passed
-        std::unique_lock<std::mutex> lock(tickMutex);
-        tickCv.wait(lock, [&] {
-            return !generatingDummies.load()
-                   || (getCurrentCycle() - lastCycle) >= interval;
-        });
-        lock.unlock();                       // don’t hold tickMutex any longer
+        {
+            std::unique_lock lock(tickMutex);
+            tickCv.wait(lock, [&] {
+                return !generatingDummies ||
+                       (getCurrentCycle() - lastCycle) >= interval;
+            });
+        }
 
-        if (!generatingDummies.load()) break;
-        if ((getCurrentCycle() - lastCycle) < interval) continue;
+        if (!generatingDummies)
+            break;
+        if ((getCurrentCycle() - lastCycle) < interval)
+            continue;
 
-        lastCycle = getCurrentCycle();       // time for a new batch!
+        lastCycle = getCurrentCycle();  // time for a new batch!
 
-        int         id   = dummyProcessCounter.fetch_add(1);
-        std::string name = std::format("process{:02d}", id);
+        int id = ConsoleManager::getInstance().getProcessIdList().size();
+        std::string name = std::format("process_{:02d}", id);
 
-        if (ConsoleManager::getInstance().createDummyProcess(name))
-            std::println("Generated dummy process: {}", name);
-        else
-            std::println("Failed to generate dummy process: {}", name);
+        ConsoleManager::getInstance().createDummyProcess(name);
     }
 }
 
-
 bool ProcessScheduler::isGeneratingDummies() const {
-    return generatingDummies.load();
+    return generatingDummies;
 }
 
 void ProcessScheduler::printQueues() const {
@@ -203,14 +201,15 @@ void ProcessScheduler::tickLoop() {
     }
 }
 
-void ProcessScheduler::executeFCFS(std::shared_ptr<Process>& proc, uint64_t& lastTickSeen) {
+void ProcessScheduler::executeFCFS(std::shared_ptr<Process>& proc,
+                                   uint64_t& lastTickSeen) {
     // FCFS: Run until process is finished or blocked
     while (proc && proc->getStatus() == RUNNING) {
         // Wait for next tick before executing next instruction
         {
-            std::unique_lock<std::mutex> lock(tickMutex);
-            tickCv.wait(
-                lock, [&] { return cpuCycles > lastTickSeen || !running; });
+            std::unique_lock lock(tickMutex);
+            tickCv.wait(lock,
+                        [&] { return cpuCycles > lastTickSeen || !running; });
 
             if (!running)
                 break;
@@ -221,16 +220,18 @@ void ProcessScheduler::executeFCFS(std::shared_ptr<Process>& proc, uint64_t& las
     }
 }
 
-void ProcessScheduler::executeRR(std::shared_ptr<Process>& proc, uint64_t& lastTickSeen) {
+void ProcessScheduler::executeRR(std::shared_ptr<Process>& proc,
+                                 uint64_t& lastTickSeen) {
     // Round Robin: Run for quantum cycles or until finished/blocked
     uint32_t cyclesExecuted = 0;
     const auto quantumCycles = Config::getInstance().getQuantumCycles();
-    while (proc && proc->getStatus() == RUNNING && cyclesExecuted < quantumCycles) {
+    while (proc && proc->getStatus() == RUNNING &&
+           cyclesExecuted < quantumCycles) {
         // Wait for next tick before executing next instruction
         {
-            std::unique_lock<std::mutex> lock(tickMutex);
-            tickCv.wait(
-                lock, [&] { return cpuCycles > lastTickSeen || !running; });
+            std::unique_lock lock(tickMutex);
+            tickCv.wait(lock,
+                        [&] { return cpuCycles > lastTickSeen || !running; });
 
             if (!running)
                 break;
@@ -242,25 +243,27 @@ void ProcessScheduler::executeRR(std::shared_ptr<Process>& proc, uint64_t& lastT
     }
 
     // If process used full quantum and is still running, preempt it
-    if (proc && proc->getStatus() == RUNNING && cyclesExecuted >= quantumCycles) {
+    if (proc && proc->getStatus() == RUNNING &&
+        cyclesExecuted >= quantumCycles) {
         proc->setStatus(READY);
         scheduleProcess(proc);  // Put back at end of ready queue
     }
 }
 
-void ProcessScheduler::workerLoop(const int coreId){
+void ProcessScheduler::workerLoop(const int coreId) {
     uint64_t lastTickSeen = 0;
     std::shared_ptr<Process> proc = nullptr;
-    auto schedulerType = Config::getInstance().getSchedulerType();
+    const auto schedulerType = Config::getInstance().getSchedulerType();
 
     while (running) {
         // Get a process from the queue
         {
-            std::unique_lock<std::mutex> lock(readyMutex);
+            std::unique_lock lock(readyMutex);
 
             readyCv.wait(lock, [&] { return !readyQueue.empty() || !running; });
 
-            if (!running) break;
+            if (!running)
+                break;
 
             if (!readyQueue.empty()) {
                 proc = readyQueue.front();
@@ -272,7 +275,8 @@ void ProcessScheduler::workerLoop(const int coreId){
             }
         }
 
-        if (!proc) continue;
+        if (!proc)
+            continue;
 
         // Execute process based on scheduler type
         if (schedulerType == SchedulerType::FCFS) {
