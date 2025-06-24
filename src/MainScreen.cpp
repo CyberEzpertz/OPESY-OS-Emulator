@@ -1,12 +1,15 @@
 #include "MainScreen.h"
 
 #include <algorithm>
+#include <iomanip>
 #include <iostream>
 #include <print>
 #include <ranges>
 #include <sstream>
 #include <string>
 #include <vector>
+#include <fstream>
+#include <filesystem>
 
 #include "ConsoleManager.h"
 #include "ProcessScheduler.h"
@@ -138,6 +141,8 @@ void MainScreen::handleUserInput() {
         std::println("- Available Cores: {}/{}",
                      scheduler.getNumAvailableCores(), scheduler.getNumTotalCores());
         scheduler.printQueues();
+    } else if (cmd == "report-util") {
+        generateUtilizationReport();
     } else {
         std::println("Error: Unknown command {}", cmd);
     }
@@ -271,4 +276,96 @@ void MainScreen::printProcessReport() {
     }
 
     std::println("{:->30}", "");
+}
+
+/// @brief Generates and saves a CPU utilization report to csopesy-log.txt
+void MainScreen::generateUtilizationReport() {
+    try {
+        ProcessScheduler& scheduler = ProcessScheduler::getInstance();
+
+        int availableCores = scheduler.getNumAvailableCores();
+        int numCores = scheduler.getNumTotalCores();
+        double cpuUtil = static_cast<double>(numCores - availableCores) / numCores * 100.0;
+
+        auto processes = ConsoleManager::getInstance().getProcessNameMap();
+
+        std::vector<std::shared_ptr<Process>> sorted;
+        for (const auto& proc : processes | std::views::values) {
+            sorted.push_back(proc);
+        }
+
+        std::ranges::sort(sorted, [](const auto& a, const auto& b) {
+            return a->getName() < b->getName();
+        });
+
+        // Generate timestamp
+        auto now = std::chrono::system_clock::now();
+        std::time_t timeT = std::chrono::system_clock::to_time_t(now);
+        std::tm local_tm = *std::localtime(&timeT);
+
+        std::ostringstream timestamp;
+        timestamp << std::put_time(&local_tm, "%m/%d/%Y, %I:%M:%S %p");
+
+        // Ensure the logs directory exists
+        std::filesystem::create_directories("logs");
+
+        // Write to file in logs folder
+        std::ofstream outFile("logs/csopesy-log.txt");
+        if (!outFile.is_open()) {
+            std::println("Error: Could not create logs/csopesy-log.txt file.");
+            return;
+        }
+
+        outFile << "CPU Utilization Report\n";
+        outFile << "Timestamp: " << timestamp.str() << "\n\n";
+        outFile << "CPU Utilization: " << std::fixed << std::setprecision(0) << cpuUtil << "%\n";
+        outFile << "Cores used: " << numCores - availableCores << "\n";
+        outFile << "Cores available: " << availableCores << "\n";
+        outFile << "Total Cores: " << numCores << "\n\n";
+
+        outFile << "------------------------------\n\n";
+
+        outFile << "Waiting Processes:\n";
+        for (const auto& process : sorted) {
+            if (process->getStatus() == WAITING) {
+                std::string coreStr = (process->getCurrentCore() == -1)
+                    ? "N/A"
+                    : std::to_string(process->getCurrentCore());
+
+                outFile << process->getName() << "\t(" << process->getTimestamp()
+                        << ")\tCore:\t" << coreStr << "\t"
+                        << process->getCurrentLine() << " / " << process->getTotalLines() << "\n";
+            }
+        }
+
+        outFile << "\nRunning processes:\n";
+        for (const auto& process : sorted) {
+            if (process->getStatus() != DONE && process->getStatus() != WAITING) {
+                std::string coreStr = (process->getCurrentCore() == -1)
+                    ? "N/A"
+                    : std::to_string(process->getCurrentCore());
+
+                outFile << process->getName() << "\t(" << process->getTimestamp()
+                        << ")\tCore:\t" << coreStr << "\t"
+                        << process->getCurrentLine() << " / " << process->getTotalLines() << "\n";
+            }
+        }
+
+        outFile << "\nFinished processes:\n";
+        for (const auto& process : sorted) {
+            if (process->getStatus() == DONE) {
+                outFile << process->getName() << "\t(" << process->getTimestamp()
+                        << ")\tFinished\t" << process->getCurrentLine()
+                        << " / " << process->getTotalLines() << "\n";
+            }
+        }
+
+        outFile << "\n------------------------------\n";
+        outFile.close();
+
+        std::println("Report generated at logs/csopesy-log.txt");
+
+    } catch (const std::exception& e) {
+        std::println("Error generating report: {}", e.what());
+    }
 }

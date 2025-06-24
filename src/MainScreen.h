@@ -46,4 +46,5 @@ private:
     /// @param command The command entered by the user.
     static void printPlaceholder(const std::string& command);
     void printProcessReport();
+    void generateUtilizationReport();
 };
