@@ -5,6 +5,7 @@
 #include <functional>
 #include <iostream>
 #include <unordered_map>
+#include <limits>
 
 std::string stripQuotes(const std::string& input) {
     if (input.size() >= 2 && input.front() == '"' && input.back() == '"') {
@@ -29,12 +30,56 @@ bool Config::loadFromFile() {
 
     std::unordered_map<std::string, std::function<void(std::ifstream&)>> pairs =
         {{"num-cpu", [this](std::ifstream& f) { f >> numCPUs; }},
-         {"quantum-cycles", [this](std::ifstream& f) { f >> quantumCycles; }},
-         {"batch-process-freq",
-          [this](std::ifstream& f) { f >> batchProcessFreq; }},
-         {"min-ins", [this](std::ifstream& f) { f >> minInstructions; }},
-         {"max-ins", [this](std::ifstream& f) { f >> maxInstructions; }},
-         {"delays-per-exec", [this](std::ifstream& f) { f >> delaysPerExec; }},
+         {"quantum-cycles", [this](std::ifstream& f) {
+             uint64_t value;
+             f >> value;
+             if (value > 0) {
+                 value = value - 1;
+                 quantumCycles = std::min(value, static_cast<uint64_t>(std::numeric_limits<uint32_t>::max()));
+             } else {
+                 quantumCycles = 0;
+             }
+         }},
+         {"batch-process-freq", [this](std::ifstream& f) {
+             uint64_t value;
+             f >> value;
+             if (value > 0) {
+                 value = value - 1;
+                 batchProcessFreq = std::min(value, static_cast<uint64_t>(std::numeric_limits<uint32_t>::max()));
+             } else {
+                 batchProcessFreq = 0;
+             }
+         }},
+         {"min-ins", [this](std::ifstream& f) {
+             uint64_t value;
+             f >> value;
+             if (value > 0) {
+                 value = value - 1;
+                 minInstructions = std::min(value, static_cast<uint64_t>(std::numeric_limits<uint32_t>::max()));
+             } else {
+                 minInstructions = 0;
+             }
+         }},
+         {"max-ins", [this](std::ifstream& f) {
+             uint64_t value;
+             f >> value;
+             if (value > 0) {
+                 value = value - 1;
+                 maxInstructions = std::min(value, static_cast<uint64_t>(std::numeric_limits<uint32_t>::max()));
+             } else {
+                 maxInstructions = 0;
+             }
+         }},
+         {"delays-per-exec", [this](std::ifstream& f) {
+             uint64_t value;
+             f >> value;
+             if (value > 0) {
+                 value = value - 1;
+                 delaysPerExec = std::min(value, static_cast<uint64_t>(std::numeric_limits<uint32_t>::max()));
+             } else {
+                 delaysPerExec = 0;
+             }
+         }},
          {"scheduler", [this](std::ifstream& f) {
               std::string sched;
               f >> sched;
@@ -59,12 +104,11 @@ bool Config::loadFromFile() {
             file >> skip;
         }
     }
-
     return true;
 }
 
 int Config::getNumCPUs() const {
-    return numCPUs;
+    return numCPUs + 1;
 }
 
 SchedulerType Config::getSchedulerType() const {
@@ -72,23 +116,23 @@ SchedulerType Config::getSchedulerType() const {
 }
 
 uint32_t Config::getQuantumCycles() const {
-    return quantumCycles;
+    return quantumCycles + 1;
 }
 
 uint32_t Config::getBatchProcessFreq() const {
-    return batchProcessFreq;
+    return batchProcessFreq + 1;
 }
 
 uint32_t Config::getMinInstructions() const {
-    return minInstructions;
+    return minInstructions + 1;
 }
 
 uint32_t Config::getMaxInstructions() const {
-    return maxInstructions;
+    return maxInstructions + 1;
 }
 
 uint32_t Config::getDelaysPerExec() const {
-    return delaysPerExec;
+    return delaysPerExec + 1;
 }
 void Config::print() const {
     std::cout << "=== Loaded Configuration ===\n";
