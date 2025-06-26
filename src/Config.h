@@ -17,9 +17,7 @@ public:
     Config& operator=(const Config&) = delete;
     Config& operator=(Config&&) = delete;
 
-
     bool loadFromFile();
-    [[nodiscard]] int getDelayPerExec() const;
     [[nodiscard]] int getNumCPUs() const;
     [[nodiscard]] SchedulerType getSchedulerType() const;
     [[nodiscard]] uint32_t getQuantumCycles() const;
@@ -35,11 +33,13 @@ private:
 
     // Default values from the specs
     int delayPerExec = 1;  // Default value if not set in config
-    int numCPUs = 4;
+    uint8_t numCPUs = 4;
     SchedulerType scheduler = SchedulerType::RR;
     uint32_t quantumCycles = 5;
     uint32_t batchProcessFreq = 1;
     uint32_t minInstructions = 1000;
     uint32_t maxInstructions = 2000;
     uint32_t delaysPerExec = 0;
+
+    bool delayEnabled = false;
 };
