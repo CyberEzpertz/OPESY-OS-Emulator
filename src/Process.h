@@ -111,6 +111,7 @@ private:
     std::unordered_map<std::string, uint16_t> variables;
     uint64_t wakeupTick;
     uint64_t lastInstructionCycle = 0;
+    uint32_t cyclesToNextExec = 0;
 
 
     /**

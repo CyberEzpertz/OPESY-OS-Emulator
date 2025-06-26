@@ -3,6 +3,7 @@
 //
 
 #include "Process.h"
+#include "Config.h"
 
 #include <chrono>
 #include <ctime>
@@ -88,16 +89,24 @@ void Process::log(const std::string& entry) {
  * @brief Increments the current line number, up to the total number of lines.
  */
 void Process::incrementLine() {
+    if (cyclesToNextExec > 0) {
+                --cyclesToNextExec;
+                return;                                 // skip this tick
+            }
+
     if (currentLine < totalLines) {
         instructions[currentInstructionIndex]->execute();
-        currentLine++;
+        ++currentLine;
 
-        if (instructions[currentInstructionIndex]->isComplete())
-            currentInstructionIndex++;
+        if (instructions[currentInstructionIndex]->isComplete()) {
+            ++currentInstructionIndex;
+        }
+        uint32_t delay = Config::getInstance().getDelaysPerExec();
+        cyclesToNextExec = (delay > 0) ? delay - 1 : 0;
     }
 
     if (currentLine >= totalLines) {
-        this->status = DONE;
+        status = DONE;
         instructions.clear();
     }
 }
