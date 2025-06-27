@@ -120,17 +120,18 @@ Operand getRandomOperand(const std::set<std::string>& declaredVars) {
 std::shared_ptr<Instruction> InstructionFactory::createRandomInstruction(
     const int pid, std::set<std::string>& declaredVars,
     const int currentNestLevel, const int maxLines) {
+    const std::string msg = std::format('Hello world from {}.', pid);
     const bool isLoopable =
         currentNestLevel < MAX_NESTED_LEVELS && maxLines > 1;
 
     switch (generateRandomNum(0, isLoopable ? 6 : 5)) {
         case 0: {  // PRINT RANDOM QUOTE
-            return std::make_shared<PrintInstruction>(getRandomQuote(), pid);
+            return std::make_shared<PrintInstruction>(msg, pid);
         }
         case 1: {  // PRINT VARIABLE VALUE
             if (declaredVars.empty())
-                return std::make_shared<PrintInstruction>(getRandomQuote(),
-                                                          pid);
+                return std::make_shared<PrintInstruction>(msg, pid);
+
             std::string var = getExistingVarName(declaredVars);
             std::string message = std::format("The value of {} is: ", var);
             return std::make_shared<PrintInstruction>(message, pid, var);
