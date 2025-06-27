@@ -64,7 +64,7 @@ uint8_t getRandomSleepTime() {
 }
 
 std::vector<std::shared_ptr<Instruction>>
-InstructionFactory::generateInstructions(const int pid) {
+InstructionFactory::generateInstructions(const int pid, const std::string process_name) {
     const int minLines = Config::getInstance().getMinInstructions();
     const int maxLines = Config::getInstance().getMaxInstructions();
     const int randMaxLines = generateRandomNum(minLines, maxLines);
@@ -118,9 +118,9 @@ Operand getRandomOperand(const std::set<std::string>& declaredVars) {
 }
 
 std::shared_ptr<Instruction> InstructionFactory::createRandomInstruction(
-    const int pid, std::set<std::string>& declaredVars,
+    const int pid, const std::string process_name,std::set<std::string>& declaredVars,
     const int currentNestLevel, const int maxLines) {
-    const std::string msg = std::format('Hello world from {}.', pid);
+    const std::string msg = std::format('Hello world from {}.', process_name);
     const bool isLoopable =
         currentNestLevel < MAX_NESTED_LEVELS && maxLines > 1;
 
