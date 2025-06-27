@@ -78,7 +78,7 @@ InstructionFactory::generateInstructions(const int pid, const std::string proces
         const int remainingLines = randMaxLines - accumulatedLines;
 
         auto instr =
-            createRandomInstruction(pid, declaredVars, 0, remainingLines);
+            createRandomInstruction(pid, process_name, declaredVars, 0, remainingLines);
         const int lines = instr->getLineCount();
 
         if (lines > remainingLines) {
@@ -120,15 +120,12 @@ Operand getRandomOperand(const std::set<std::string>& declaredVars) {
 std::shared_ptr<Instruction> InstructionFactory::createRandomInstruction(
     const int pid, const std::string process_name,std::set<std::string>& declaredVars,
     const int currentNestLevel, const int maxLines) {
-    const std::string msg = std::format('Hello world from {}.', process_name);
+    const std::string msg = std::format("Hello world from {}.", process_name);
     const bool isLoopable =
         currentNestLevel < MAX_NESTED_LEVELS && maxLines > 1;
 
-    switch (generateRandomNum(0, isLoopable ? 6 : 5)) {
-        case 0: {  // PRINT RANDOM QUOTE
-            return std::make_shared<PrintInstruction>(msg, pid);
-        }
-        case 1: {  // PRINT VARIABLE VALUE
+    switch (generateRandomNum(0, isLoopable ? 5 : 4)) {
+        case 0: {  // PRINT VARIABLE VALUE
             if (declaredVars.empty())
                 return std::make_shared<PrintInstruction>(msg, pid);
 
@@ -136,18 +133,18 @@ std::shared_ptr<Instruction> InstructionFactory::createRandomInstruction(
             std::string message = std::format("The value of {} is: ", var);
             return std::make_shared<PrintInstruction>(message, pid, var);
         }
-        case 2: {  // DECLARE
+        case 1: {  // DECLARE
             std::string var = getNewVarName(declaredVars);
             uint16_t val =
                 static_cast<uint16_t>(generateRandomNum(0, UINT16_MAX));
             declaredVars.insert(var);
             return std::make_shared<DeclareInstruction>(var, val, pid);
         }
-        case 3: {  // SLEEP
+        case 2: {  // SLEEP
             return std::make_shared<SleepInstruction>(getRandomSleepTime(),
                                                       pid);
         }
-        case 4: {  // ADD
+        case 3: {  // ADD
             std::string result = getRandomVarName(declaredVars);
             Operand lhs = getRandomOperand(declaredVars);
             Operand rhs = getRandomOperand(declaredVars);
@@ -155,7 +152,7 @@ std::shared_ptr<Instruction> InstructionFactory::createRandomInstruction(
             return std::make_shared<ArithmeticInstruction>(result, lhs, rhs,
                                                            Operation::ADD, pid);
         }
-        case 5: {  // SUBTRACT
+        case 4: {  // SUBTRACT
             std::string result = getRandomVarName(declaredVars);
             Operand lhs = getRandomOperand(declaredVars);
             Operand rhs = getRandomOperand(declaredVars);
@@ -163,8 +160,8 @@ std::shared_ptr<Instruction> InstructionFactory::createRandomInstruction(
             return std::make_shared<ArithmeticInstruction>(
                 result, lhs, rhs, Operation::SUBTRACT, pid);
         }
-        case 6: {
-            return createForLoop(pid, maxLines, declaredVars,
+        case 5: {
+            return createForLoop(pid, process_name, maxLines, declaredVars,
                                  currentNestLevel + 1);
         }
         default:;
@@ -175,7 +172,7 @@ std::shared_ptr<Instruction> InstructionFactory::createRandomInstruction(
 }
 
 std::shared_ptr<Instruction> InstructionFactory::createForLoop(
-    const int pid, const int maxLines, std::set<std::string>& declaredVars,
+    const int pid, std::string process_name, const int maxLines, std::set<std::string>& declaredVars,
     const int currentNestLevel) {
     if (maxLines <= 1 || currentNestLevel > MAX_NESTED_LEVELS) {
         // Not enough space or exceeded nest level; fallback
@@ -203,7 +200,7 @@ std::shared_ptr<Instruction> InstructionFactory::createForLoop(
         const int remainingLines = maxGeneratedLines - accumulatedLines;
 
         const auto instr = createRandomInstruction(
-            pid, declaredVars, currentNestLevel + 1, remainingLines);
+            pid, process_name,declaredVars, currentNestLevel + 1, remainingLines);
 
         const int lineCount = instr->getLineCount();
 

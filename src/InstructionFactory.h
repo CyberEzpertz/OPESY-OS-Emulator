@@ -22,6 +22,6 @@ private:
         int maxLines);
 
     static std::shared_ptr<Instruction> createForLoop(
-        int pid, int maxLines, std::set<std::string>& declaredVars,
+        int pid, std::string process_name, int maxLines, std::set<std::string>& declaredVars,
         int currentNestLevel);
 };
