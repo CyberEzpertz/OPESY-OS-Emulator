@@ -18,10 +18,10 @@ public:
 
 private:
     static std::shared_ptr<Instruction> createRandomInstruction(
-        int pid, std::string process_name, std::set<std::string>& declaredVars, int currentNestLevel,
+        int pid, std::string process_name, std::vector<std::set<std::string>>& declaredVarsStack, int currentNestLevel,
         int maxLines);
 
     static std::shared_ptr<Instruction> createForLoop(
-        int pid, std::string process_name, int maxLines, std::set<std::string>& declaredVars,
+        int pid, std::string process_name, int maxLines, std::vector<std::set<std::string>>& declaredVarsStack,
         int currentNestLevel);
 };
