@@ -11,16 +11,17 @@
 class InstructionFactory {
 public:
     static std::vector<std::shared_ptr<Instruction>> generateInstructions(
-        int pid);
+        int pid,
+        std::string process_name);
     static std::mt19937 rng;
     static int generateRandomNum(int min, int max);
 
 private:
     static std::shared_ptr<Instruction> createRandomInstruction(
-        int pid, std::set<std::string>& declaredVars, int currentNestLevel,
+        int pid, std::string process_name, std::vector<std::set<std::string>>& declaredVarsStack, int currentNestLevel,
         int maxLines);
 
     static std::shared_ptr<Instruction> createForLoop(
-        int pid, int maxLines, std::set<std::string>& declaredVars,
+        int pid, std::string process_name, int maxLines, std::vector<std::set<std::string>>& declaredVarsStack,
         int currentNestLevel);
 };

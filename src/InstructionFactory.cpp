@@ -36,21 +36,43 @@ std::string getRandomQuote() {
     return quotes[idx];
 }
 
-std::string getNewVarName(const std::set<std::string>& declaredVars) {
-    std::string name = std::format("var_{}", declaredVars.size());
+std::string getNewVarName(const std::vector<std::set<std::string>>& declaredVarsStack) {
+    // Count total variables across all scopes to ensure uniqueness
+    size_t totalVars = 0;
+    std::set<std::string> allVars;
+
+    for (const auto& scope : declaredVarsStack) {
+        for (const auto& var : scope) {
+            allVars.insert(var);
+        }
+    }
+
+    std::string name;
+    do {
+        name = std::format("var_{}", totalVars);
+        totalVars++;
+    } while (allVars.find(name) != allVars.end());
+
     return name;
 }
 
-std::string getExistingVarName(const std::set<std::string>& declaredVars) {
-    if (declaredVars.empty())
-        return getNewVarName(declaredVars);
+std::string getExistingVarName(const std::vector<std::set<std::string>>& declaredVarsStack) {
+    if (declaredVarsStack.empty())
+        return getNewVarName(declaredVarsStack);
 
-    const int randomNum =
-        InstructionFactory::generateRandomNum(0, declaredVars.size() - 1);
-    auto it = declaredVars.begin();
-    std::advance(it, randomNum);
+    // Collect all variables from all scopes
+    std::vector<std::string> allVars;
+    for (const auto& scope : declaredVarsStack) {
+        for (const auto& var : scope) {
+            allVars.push_back(var);
+        }
+    }
 
-    return *it;
+    if (allVars.empty())
+        return getNewVarName(declaredVarsStack);
+
+    const int randomNum = InstructionFactory::generateRandomNum(0, allVars.size() - 1);
+    return allVars[randomNum];
 }
 
 uint16_t getRandomUint16() {
@@ -64,7 +86,7 @@ uint8_t getRandomSleepTime() {
 }
 
 std::vector<std::shared_ptr<Instruction>>
-InstructionFactory::generateInstructions(const int pid) {
+InstructionFactory::generateInstructions(const int pid, const std::string process_name) {
     const int minLines = Config::getInstance().getMinInstructions();
     const int maxLines = Config::getInstance().getMaxInstructions();
     const int randMaxLines = generateRandomNum(minLines, maxLines);
@@ -72,13 +94,16 @@ InstructionFactory::generateInstructions(const int pid) {
     std::vector<std::shared_ptr<Instruction>> instructions;
 
     int accumulatedLines = 0;
-    auto declaredVars = std::set<std::string>{};
+    auto declaredVarsStack = std::vector<std::set<std::string>>{};
+
+    // Initialize with global scope
+    declaredVarsStack.push_back({});
 
     while (accumulatedLines < randMaxLines) {
         const int remainingLines = randMaxLines - accumulatedLines;
 
         auto instr =
-            createRandomInstruction(pid, declaredVars, 0, remainingLines);
+            createRandomInstruction(pid, process_name, declaredVarsStack, 0, remainingLines);
         const int lines = instr->getLineCount();
 
         if (lines > remainingLines) {
@@ -97,20 +122,28 @@ int InstructionFactory::generateRandomNum(const int min, const int max) {
     return dist(rng);
 }
 
-std::string getRandomVarName(const std::set<std::string>& declaredVars) {
-    const bool useExisting = !declaredVars.empty() &&
-                             InstructionFactory::generateRandomNum(0, 1) == 0;
+std::string getRandomVarName(const std::vector<std::set<std::string>>& declaredVarsStack) {
+    // Check if any variables exist across all scopes
+    bool hasVariables = false;
+    for (const auto& scope : declaredVarsStack) {
+        if (!scope.empty()) {
+            hasVariables = true;
+            break;
+        }
+    }
+
+    const bool useExisting = hasVariables && InstructionFactory::generateRandomNum(0, 1) == 0;
 
     if (useExisting) {
-        return getExistingVarName(declaredVars);
+        return getExistingVarName(declaredVarsStack);
     } else {
-        return getNewVarName(declaredVars);
+        return getNewVarName(declaredVarsStack);
     }
 }
 
-Operand getRandomOperand(const std::set<std::string>& declaredVars) {
+Operand getRandomOperand(const std::vector<std::set<std::string>>& declaredVarsStack) {
     if (InstructionFactory::generateRandomNum(0, 1) == 0) {
-        return getRandomVarName(declaredVars);
+        return getRandomVarName(declaredVarsStack);
     } else {
         return static_cast<uint16_t>(
             InstructionFactory::generateRandomNum(0, UINT16_MAX));
@@ -118,52 +151,74 @@ Operand getRandomOperand(const std::set<std::string>& declaredVars) {
 }
 
 std::shared_ptr<Instruction> InstructionFactory::createRandomInstruction(
-    const int pid, std::set<std::string>& declaredVars,
+    const int pid, const std::string process_name, std::vector<std::set<std::string>>& declaredVarsStack,
     const int currentNestLevel, const int maxLines) {
+    const std::string msg = std::format("Hello world from {}.", process_name);
     const bool isLoopable =
         currentNestLevel < MAX_NESTED_LEVELS && maxLines > 1;
 
-    switch (generateRandomNum(0, isLoopable ? 6 : 5)) {
-        case 0: {  // PRINT RANDOM QUOTE
-            return std::make_shared<PrintInstruction>(getRandomQuote(), pid);
-        }
-        case 1: {  // PRINT VARIABLE VALUE
-            if (declaredVars.empty())
-                return std::make_shared<PrintInstruction>(getRandomQuote(),
-                                                          pid);
-            std::string var = getExistingVarName(declaredVars);
+    switch (generateRandomNum(0, isLoopable ? 5 : 4)) {
+        case 0: {  // PRINT VARIABLE VALUE
+            // Check if any variables exist across all scopes
+            bool hasVariables = false;
+            for (const auto& scope : declaredVarsStack) {
+                if (!scope.empty()) {
+                    hasVariables = true;
+                    break;
+                }
+            }
+
+            if (!hasVariables)
+                return std::make_shared<PrintInstruction>(msg, pid);
+
+            std::string var = getExistingVarName(declaredVarsStack);
             std::string message = std::format("The value of {} is: ", var);
             return std::make_shared<PrintInstruction>(message, pid, var);
         }
-        case 2: {  // DECLARE
-            std::string var = getNewVarName(declaredVars);
+        case 1: {  // DECLARE
+            std::string var = getNewVarName(declaredVarsStack);
             uint16_t val =
                 static_cast<uint16_t>(generateRandomNum(0, UINT16_MAX));
-            declaredVars.insert(var);
+
+            // Add to current (innermost) scope
+            if (!declaredVarsStack.empty()) {
+                declaredVarsStack.back().insert(var);
+            }
+
             return std::make_shared<DeclareInstruction>(var, val, pid);
         }
-        case 3: {  // SLEEP
+        case 2: {  // SLEEP
             return std::make_shared<SleepInstruction>(getRandomSleepTime(),
                                                       pid);
         }
-        case 4: {  // ADD
-            std::string result = getRandomVarName(declaredVars);
-            Operand lhs = getRandomOperand(declaredVars);
-            Operand rhs = getRandomOperand(declaredVars);
-            declaredVars.insert(result);
+        case 3: {  // ADD
+            std::string result = getRandomVarName(declaredVarsStack);
+            Operand lhs = getRandomOperand(declaredVarsStack);
+            Operand rhs = getRandomOperand(declaredVarsStack);
+
+            // Add to current (innermost) scope
+            if (!declaredVarsStack.empty()) {
+                declaredVarsStack.back().insert(result);
+            }
+
             return std::make_shared<ArithmeticInstruction>(result, lhs, rhs,
                                                            Operation::ADD, pid);
         }
-        case 5: {  // SUBTRACT
-            std::string result = getRandomVarName(declaredVars);
-            Operand lhs = getRandomOperand(declaredVars);
-            Operand rhs = getRandomOperand(declaredVars);
-            declaredVars.insert(result);
+        case 4: {  // SUBTRACT
+            std::string result = getRandomVarName(declaredVarsStack);
+            Operand lhs = getRandomOperand(declaredVarsStack);
+            Operand rhs = getRandomOperand(declaredVarsStack);
+
+            // Add to current (innermost) scope
+            if (!declaredVarsStack.empty()) {
+                declaredVarsStack.back().insert(result);
+            }
+
             return std::make_shared<ArithmeticInstruction>(
                 result, lhs, rhs, Operation::SUBTRACT, pid);
         }
-        case 6: {
-            return createForLoop(pid, maxLines, declaredVars,
+        case 5: {
+            return createForLoop(pid, process_name, maxLines, declaredVarsStack,
                                  currentNestLevel + 1);
         }
         default:;
@@ -174,7 +229,7 @@ std::shared_ptr<Instruction> InstructionFactory::createRandomInstruction(
 }
 
 std::shared_ptr<Instruction> InstructionFactory::createForLoop(
-    const int pid, const int maxLines, std::set<std::string>& declaredVars,
+    const int pid, std::string process_name, const int maxLines, std::vector<std::set<std::string>>& declaredVarsStack,
     const int currentNestLevel) {
     if (maxLines <= 1 || currentNestLevel > MAX_NESTED_LEVELS) {
         // Not enough space or exceeded nest level; fallback
@@ -198,11 +253,13 @@ std::shared_ptr<Instruction> InstructionFactory::createForLoop(
 
     int accumulatedLines = 0;
 
+    // Push new scope for loop body
+    declaredVarsStack.push_back({});
+
     while (accumulatedLines < maxGeneratedLines) {
         const int remainingLines = maxGeneratedLines - accumulatedLines;
 
-        const auto instr = createRandomInstruction(
-            pid, declaredVars, currentNestLevel + 1, remainingLines);
+        const auto instr = createRandomInstruction(pid, process_name, declaredVarsStack, currentNestLevel + 1, remainingLines);
 
         const int lineCount = instr->getLineCount();
 
@@ -215,6 +272,9 @@ std::shared_ptr<Instruction> InstructionFactory::createForLoop(
         accumulatedLines += lineCount;
         loopBody.push_back(instr);
     }
+
+    // Pop the loop body scope
+    declaredVarsStack.pop_back();
 
     return std::make_shared<ForInstruction>(pid, loopCount, loopBody);
 }
