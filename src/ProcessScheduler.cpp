@@ -217,7 +217,7 @@ void ProcessScheduler::executeFCFS(std::shared_ptr<Process>& proc,
             lastTickSeen = cpuCycles;
         }
 
-        if (cpuCycles % delayCycles == 0) {
+        if (delayCycles == 0 || cpuCycles % delayCycles == 0) {
             proc->incrementLine();
         }
     }
@@ -242,7 +242,7 @@ void ProcessScheduler::executeRR(std::shared_ptr<Process>& proc,
             lastTickSeen = cpuCycles;
         }
 
-        if (cpuCycles % delayCycles == 0) {
+        if (delayCycles == 0 || cpuCycles % delayCycles == 0) {
             proc->incrementLine();
             cyclesExecuted++;
         }
