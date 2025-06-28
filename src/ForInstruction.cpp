@@ -1,4 +1,5 @@
 #include "ForInstruction.h"
+#include "Process.h"
 
 #include <print>
 
@@ -9,7 +10,7 @@ ForInstruction::ForInstruction(
       totalLoops(totalLoops),
       currentLoop(0),
       currentInstructIdx(0),
-      instructions(instructions) {
+      instructions(instructions){
     int totalLineCount = 0;
     for (const auto &line : instructions) {
         totalLineCount += line->getLineCount();
@@ -24,6 +25,12 @@ void ForInstruction::execute() {
         std::println("Tried executing for-loop beyond bounds.");
         return;
     }
+    auto process = getProcess();
+
+    // If starting a new loop iteration, enter a new scope
+    if (currentInstructIdx == 0) {
+        process->enterScope();
+    }
 
     const auto &currentInstruction = instructions[currentInstructIdx];
     currentInstruction->execute();
@@ -32,8 +39,11 @@ void ForInstruction::execute() {
         currentInstructIdx = (currentInstructIdx + 1) % instructions.size();
 
         // Check if it's 0, if it is that means we've looped back.
-        currentLoop += currentInstructIdx == 0 ? 1 : 0;
-
+        if (currentInstructIdx == 0) {
+            // Exit scope before completing this loop iteration
+            currentLoop++;
+            process->exitScope();
+        }
         // If it's a for-loop, we have to restart its counters for the next
         // iterations.
         if (const auto forInst =

@@ -8,6 +8,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <stack>
 
 #include "Instruction.h"
 #include "PrintInstruction.h"
@@ -87,13 +88,18 @@ public:
     int getCurrentCore() const;
     void setInstructions(
         const std::vector<std::shared_ptr<Instruction>>& instructions);
-    void setVariable(const std::string& name, uint16_t value);
+    bool setVariable(const std::string& name, uint16_t value);
     bool getIsFinished() const;
     uint16_t getVariable(const std::string& name);
     uint64_t getWakeupTick() const;
     void setWakeupTick(const uint64_t value);
     void setLastInstructionCycle(uint64_t cycle) { lastInstructionCycle = cycle; }
     uint64_t getLastInstructionCycle() const { return lastInstructionCycle; }
+
+    void enterScope();
+    void exitScope();
+    bool declareVariable(const std::string& name, uint16_t value);
+
 
 
 private:
@@ -108,7 +114,7 @@ private:
     std::atomic<ProcessStatus> status;
     std::atomic<int> currentCore;
     std::vector<std::shared_ptr<Instruction>> instructions;
-    std::unordered_map<std::string, uint16_t> variables;
+    std::vector<std::unordered_map<std::string, uint16_t>> variableStack;
     uint64_t wakeupTick;
     uint64_t lastInstructionCycle = 0;
 
