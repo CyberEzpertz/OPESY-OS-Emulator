@@ -121,23 +121,23 @@ SchedulerType Config::getSchedulerType() const {
     return scheduler;
 }
 
-uint32_t Config::getQuantumCycles() const {
+uint64_t Config::getQuantumCycles() const {
     return quantumCycles + 1;
 }
 
-uint32_t Config::getBatchProcessFreq() const {
+uint64_t Config::getBatchProcessFreq() const {
     return batchProcessFreq + 1;
 }
 
-uint32_t Config::getMinInstructions() const {
+uint64_t Config::getMinInstructions() const {
     return minInstructions + 1;
 }
 
-uint32_t Config::getMaxInstructions() const {
+uint64_t Config::getMaxInstructions() const {
     return maxInstructions + 1;
 }
 
-uint32_t Config::getDelaysPerExec() const {
+uint64_t Config::getDelaysPerExec() const {
     return delaysPerExec + (delayEnabled ? 1 : 0);
 }
 
