@@ -5,10 +5,11 @@
 #pragma once
 
 #include <atomic>
+#include <shared_mutex>
+#include <stack>
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include <stack>
 
 #include "Instruction.h"
 #include "PrintInstruction.h"
@@ -93,14 +94,16 @@ public:
     uint16_t getVariable(const std::string& name);
     uint64_t getWakeupTick() const;
     void setWakeupTick(const uint64_t value);
-    void setLastInstructionCycle(uint64_t cycle) { lastInstructionCycle = cycle; }
-    uint64_t getLastInstructionCycle() const { return lastInstructionCycle; }
+    void setLastInstructionCycle(uint64_t cycle) {
+        lastInstructionCycle = cycle;
+    }
+    uint64_t getLastInstructionCycle() const {
+        return lastInstructionCycle;
+    }
 
     void enterScope();
     void exitScope();
     bool declareVariable(const std::string& name, uint16_t value);
-
-
 
 private:
     int processID;                  ///< Unique identifier for the process.
@@ -117,7 +120,8 @@ private:
     std::vector<std::unordered_map<std::string, uint16_t>> variableStack;
     uint64_t wakeupTick;
     uint64_t lastInstructionCycle = 0;
-
+    std::mutex scopeMutex;
+    std::mutex instructionsMutex;
 
     /**
      * @brief Generates a formatted timestamp for the process creation time.

@@ -10,6 +10,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <shared_mutex>
 #include <sstream>
 
 #include "Config.h"
@@ -91,6 +92,7 @@ void Process::log(const std::string& entry) {
  * @brief Increments the current line number, up to the total number of lines.
  */
 void Process::incrementLine() {
+    std::lock_guard lock(instructionsMutex);
     if (currentLine < totalLines) {
         instructions[currentInstructionIndex]->execute();
         currentLine++;
@@ -121,6 +123,7 @@ int Process::getCurrentCore() const {
 }
 void Process::setInstructions(
     const std::vector<std::shared_ptr<Instruction>>& instructions) {
+    std::lock_guard lock(instructionsMutex);
     this->instructions = instructions;
     this->totalLines = 0;
 
@@ -129,6 +132,8 @@ void Process::setInstructions(
     }
 }
 bool Process::setVariable(const std::string& name, const uint16_t value) {
+    std::lock_guard lock(scopeMutex);
+
     for (auto it = variableStack.rbegin(); it != variableStack.rend(); ++it) {
         if (it->contains(name)) {
             (*it)[name] = value;
@@ -139,6 +144,8 @@ bool Process::setVariable(const std::string& name, const uint16_t value) {
 }
 
 uint16_t Process::getVariable(const std::string& name) {
+    std::lock_guard lock(scopeMutex);
+
     for (auto it = variableStack.rbegin(); it != variableStack.rend(); ++it) {
         if (it->contains(name)) {
             return it->at(name);
@@ -164,16 +171,24 @@ void Process::setWakeupTick(const uint64_t value) {
 }
 
 void Process::enterScope() {
+    std::lock_guard lock(scopeMutex);
     variableStack.emplace_back();
 }
 
 void Process::exitScope() {
+    std::lock_guard lock(scopeMutex);
+
     if (!variableStack.empty()) {
         variableStack.pop_back();
+    } else {
+        std::cout << ("Error: Tried to exit scope but scope stack is empty.")
+                  << std::endl;
     }
 }
 
 bool Process::declareVariable(const std::string& name, uint16_t value) {
+    std::lock_guard lock(scopeMutex);
+
     if (variableStack.empty())
         return false;
     auto& currentScope = variableStack.back();
