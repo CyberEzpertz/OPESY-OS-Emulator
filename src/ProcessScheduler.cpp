@@ -204,6 +204,7 @@ void ProcessScheduler::tickLoop() {
 void ProcessScheduler::executeFCFS(std::shared_ptr<Process>& proc,
                                    uint64_t& lastTickSeen) {
     // FCFS: Run until process is finished or blocked
+    const uint32_t delayCycles = Config::getInstance().getDelaysPerExec();
     while (proc && proc->getStatus() == RUNNING) {
         // Wait for next tick before executing next instruction
         {
@@ -216,7 +217,9 @@ void ProcessScheduler::executeFCFS(std::shared_ptr<Process>& proc,
             lastTickSeen = cpuCycles;
         }
 
-        proc->incrementLine();
+        if (cpuCycles % delayCycles == 0) {
+            proc->incrementLine();
+        }
     }
 }
 
@@ -224,6 +227,7 @@ void ProcessScheduler::executeRR(std::shared_ptr<Process>& proc,
                                  uint64_t& lastTickSeen) {
     // Round Robin: Run for quantum cycles or until finished/blocked
     uint32_t cyclesExecuted = 0;
+    const uint32_t delayCycles   = Config::getInstance().getDelaysPerExec();
     const auto quantumCycles = Config::getInstance().getQuantumCycles();
     while (proc && proc->getStatus() == RUNNING &&
            cyclesExecuted < quantumCycles) {
@@ -238,8 +242,10 @@ void ProcessScheduler::executeRR(std::shared_ptr<Process>& proc,
             lastTickSeen = cpuCycles;
         }
 
-        proc->incrementLine();
-        cyclesExecuted++;
+        if (cpuCycles % delayCycles == 0) {
+            proc->incrementLine();
+            cyclesExecuted++;
+        }
     }
 
     // If process used full quantum and is still running, preempt it
