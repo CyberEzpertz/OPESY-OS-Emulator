@@ -2,6 +2,7 @@
 
 #include <cstdlib>
 #include <format>
+#include <iostream>
 #include <memory>
 #include <random>
 #include <set>
@@ -36,7 +37,8 @@ std::string getRandomQuote() {
     return quotes[idx];
 }
 
-std::string getNewVarName(const std::vector<std::set<std::string>>& declaredVarsStack) {
+std::string getNewVarName(
+    const std::vector<std::set<std::string>>& declaredVarsStack) {
     // Count total variables across all scopes to ensure uniqueness
     size_t totalVars = 0;
     std::set<std::string> allVars;
@@ -56,7 +58,8 @@ std::string getNewVarName(const std::vector<std::set<std::string>>& declaredVars
     return name;
 }
 
-std::string getExistingVarName(const std::vector<std::set<std::string>>& declaredVarsStack) {
+std::string getExistingVarName(
+    const std::vector<std::set<std::string>>& declaredVarsStack) {
     if (declaredVarsStack.empty())
         return getNewVarName(declaredVarsStack);
 
@@ -71,7 +74,8 @@ std::string getExistingVarName(const std::vector<std::set<std::string>>& declare
     if (allVars.empty())
         return getNewVarName(declaredVarsStack);
 
-    const int randomNum = InstructionFactory::generateRandomNum(0, allVars.size() - 1);
+    const int randomNum =
+        InstructionFactory::generateRandomNum(0, allVars.size() - 1);
     return allVars[randomNum];
 }
 
@@ -86,7 +90,8 @@ uint8_t getRandomSleepTime() {
 }
 
 std::vector<std::shared_ptr<Instruction>>
-InstructionFactory::generateInstructions(const int pid, const std::string process_name) {
+InstructionFactory::generateInstructions(const int pid,
+                                         const std::string process_name) {
     const int minLines = Config::getInstance().getMinInstructions();
     const int maxLines = Config::getInstance().getMaxInstructions();
     const int randMaxLines = generateRandomNum(minLines, maxLines);
@@ -102,8 +107,8 @@ InstructionFactory::generateInstructions(const int pid, const std::string proces
     while (accumulatedLines < randMaxLines) {
         const int remainingLines = randMaxLines - accumulatedLines;
 
-        auto instr =
-            createRandomInstruction(pid, process_name, declaredVarsStack, 0, remainingLines);
+        auto instr = createRandomInstruction(
+            pid, process_name, declaredVarsStack, 0, remainingLines);
         const int lines = instr->getLineCount();
 
         if (lines > remainingLines) {
@@ -122,7 +127,8 @@ int InstructionFactory::generateRandomNum(const int min, const int max) {
     return dist(rng);
 }
 
-std::string getRandomVarName(const std::vector<std::set<std::string>>& declaredVarsStack) {
+std::string getRandomVarName(
+    const std::vector<std::set<std::string>>& declaredVarsStack) {
     // Check if any variables exist across all scopes
     bool hasVariables = false;
     for (const auto& scope : declaredVarsStack) {
@@ -132,7 +138,8 @@ std::string getRandomVarName(const std::vector<std::set<std::string>>& declaredV
         }
     }
 
-    const bool useExisting = hasVariables && InstructionFactory::generateRandomNum(0, 1) == 0;
+    const bool useExisting =
+        hasVariables && InstructionFactory::generateRandomNum(0, 1) == 0;
 
     if (useExisting) {
         return getExistingVarName(declaredVarsStack);
@@ -141,7 +148,8 @@ std::string getRandomVarName(const std::vector<std::set<std::string>>& declaredV
     }
 }
 
-Operand getRandomOperand(const std::vector<std::set<std::string>>& declaredVarsStack) {
+Operand getRandomOperand(
+    const std::vector<std::set<std::string>>& declaredVarsStack) {
     if (InstructionFactory::generateRandomNum(0, 1) == 0) {
         return getRandomVarName(declaredVarsStack);
     } else {
@@ -151,7 +159,8 @@ Operand getRandomOperand(const std::vector<std::set<std::string>>& declaredVarsS
 }
 
 std::shared_ptr<Instruction> InstructionFactory::createRandomInstruction(
-    const int pid, const std::string process_name, std::vector<std::set<std::string>>& declaredVarsStack,
+    const int pid, const std::string process_name,
+    std::vector<std::set<std::string>>& declaredVarsStack,
     const int currentNestLevel, const int maxLines) {
     const std::string msg = std::format("Hello world from {}.", process_name);
     const bool isLoopable =
@@ -229,7 +238,8 @@ std::shared_ptr<Instruction> InstructionFactory::createRandomInstruction(
 }
 
 std::shared_ptr<Instruction> InstructionFactory::createForLoop(
-    const int pid, std::string process_name, const int maxLines, std::vector<std::set<std::string>>& declaredVarsStack,
+    const int pid, std::string process_name, const int maxLines,
+    std::vector<std::set<std::string>>& declaredVarsStack,
     const int currentNestLevel) {
     if (maxLines <= 1 || currentNestLevel > MAX_NESTED_LEVELS) {
         // Not enough space or exceeded nest level; fallback
@@ -259,7 +269,9 @@ std::shared_ptr<Instruction> InstructionFactory::createForLoop(
     while (accumulatedLines < maxGeneratedLines) {
         const int remainingLines = maxGeneratedLines - accumulatedLines;
 
-        const auto instr = createRandomInstruction(pid, process_name, declaredVarsStack, currentNestLevel + 1, remainingLines);
+        const auto instr =
+            createRandomInstruction(pid, process_name, declaredVarsStack,
+                                    currentNestLevel + 1, remainingLines);
 
         const int lineCount = instr->getLineCount();
 
@@ -277,4 +289,28 @@ std::shared_ptr<Instruction> InstructionFactory::createForLoop(
     declaredVarsStack.pop_back();
 
     return std::make_shared<ForInstruction>(pid, loopCount, loopBody);
+}
+
+std::vector<std::shared_ptr<Instruction>>
+InstructionFactory::createAlternatingPrintAdd(const int pid) {
+    const int minLines = Config::getInstance().getMinInstructions();
+    const int maxLines = Config::getInstance().getMaxInstructions();
+    const int randMaxLines = generateRandomNum(minLines, maxLines);
+
+    std::vector<std::shared_ptr<Instruction>> instructions;
+
+    for (int i = 0; i < randMaxLines; i++) {
+        if (i % 2 == 0) {
+            auto instr = std::make_shared<PrintInstruction>(
+                PrintInstruction("Value from: ", pid, "x"));
+            instructions.push_back(instr);
+        } else {
+            uint16_t randNum = generateRandomNum(1, 10);
+            auto instr = std::make_shared<ArithmeticInstruction>(
+                "x", "x", randNum, Operation::ADD, pid);
+            instructions.push_back(instr);
+        }
+    }
+
+    return instructions;
 }

@@ -3,7 +3,6 @@
 //
 
 #include "Process.h"
-#include "Config.h"
 
 #include <chrono>
 #include <ctime>
@@ -13,6 +12,8 @@
 #include <iostream>
 #include <sstream>
 
+#include "Config.h"
+
 Process::Process(const int id, const std::string& name)
     : processID(id),
       processName(name),
@@ -20,7 +21,8 @@ Process::Process(const int id, const std::string& name)
       currentInstructionIndex(0),
       status(READY),
       currentCore(-1),
-      wakeupTick(0) {
+      wakeupTick(0),
+      variableStack({{}}) {
     totalLines = 0;
     for (const auto& instr : instructions) {
         totalLines += instr->getLineCount();
@@ -133,12 +135,10 @@ bool Process::setVariable(const std::string& name, const uint16_t value) {
             return true;
         }
     }
-    return false; // Not found in any scope
+    return false;  // Not found in any scope
 }
 
-
 uint16_t Process::getVariable(const std::string& name) {
-    int index = static_cast<int>(variableStack.size()) - 1;
     for (auto it = variableStack.rbegin(); it != variableStack.rend(); ++it) {
         if (it->contains(name)) {
             return it->at(name);
@@ -174,10 +174,11 @@ void Process::exitScope() {
 }
 
 bool Process::declareVariable(const std::string& name, uint16_t value) {
-    if (variableStack.empty()) return false;
+    if (variableStack.empty())
+        return false;
     auto& currentScope = variableStack.back();
     if (currentScope.contains(name)) {
-        return false; // Already declared in this scope
+        return false;  // Already declared in this scope
     }
     currentScope[name] = value;
     return true;

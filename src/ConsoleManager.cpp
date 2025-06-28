@@ -67,6 +67,9 @@ bool ConsoleManager::createProcess(const std::string& processName) {
     processNameMap[processName] = newProcess;
     processIDList.push_back(newProcess);
 
+    const auto instructions =
+        InstructionFactory::createAlternatingPrintAdd(PID);
+    newProcess->setInstructions(instructions);
     ProcessScheduler::getInstance().scheduleProcess(newProcess);
 
     return true;
