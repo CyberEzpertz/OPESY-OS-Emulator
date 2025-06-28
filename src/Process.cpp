@@ -126,27 +126,61 @@ void Process::setInstructions(
         this->totalLines += instr->getLineCount();
     }
 }
-void Process::setVariable(const std::string& name, const uint16_t value) {
-    variables[name] = value;
+bool Process::setVariable(const std::string& name, const uint16_t value) {
+    for (auto it = variableStack.rbegin(); it != variableStack.rend(); ++it) {
+        if (it->contains(name)) {
+            (*it)[name] = value;
+            return true;
+        }
+    }
+    return false; // Not found in any scope
+}
+
+
+uint16_t Process::getVariable(const std::string& name) {
+    int index = static_cast<int>(variableStack.size()) - 1;
+    for (auto it = variableStack.rbegin(); it != variableStack.rend(); ++it) {
+        if (it->contains(name)) {
+            return it->at(name);
+        }
+    }
+
+    if (!variableStack.empty()) {
+        variableStack.back()[name] = 0;
+        return 0;
+    }
+    return 0;
 }
 
 bool Process::getIsFinished() const {
     return currentLine >= totalLines;
 }
 
-uint16_t Process::getVariable(const std::string& name) {
-    // If it doesn't exist, should be default value of 0
-    if (!variables.contains(name)) {
-        variables[name] = 0;
-    }
-
-    return variables[name];
-}
 uint64_t Process::getWakeupTick() const {
     return wakeupTick;
 }
 void Process::setWakeupTick(const uint64_t value) {
     this->wakeupTick = value;
+}
+
+void Process::enterScope() {
+    variableStack.emplace_back();
+}
+
+void Process::exitScope() {
+    if (!variableStack.empty()) {
+        variableStack.pop_back();
+    }
+}
+
+bool Process::declareVariable(const std::string& name, uint16_t value) {
+    if (variableStack.empty()) return false;
+    auto& currentScope = variableStack.back();
+    if (currentScope.contains(name)) {
+        return false; // Already declared in this scope
+    }
+    currentScope[name] = value;
+    return true;
 }
 
 /**
