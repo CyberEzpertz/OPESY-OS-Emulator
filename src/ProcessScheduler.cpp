@@ -258,8 +258,6 @@ void ProcessScheduler::executeRR(std::shared_ptr<Process>& proc,
 
 void ProcessScheduler::workerLoop(const int coreId) {
     uint64_t lastTickSeen = 0;
-    uint64_t localTickCounter = 0;
-    const auto delay = Config::getInstance().getDelaysPerExec();
     std::shared_ptr<Process> proc = nullptr;
     const auto schedulerType = Config::getInstance().getSchedulerType();
 

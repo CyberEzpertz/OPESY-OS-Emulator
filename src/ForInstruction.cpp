@@ -16,7 +16,7 @@ ForInstruction::ForInstruction(
     }
 
     // We add 1 because the for itself is a line of code
-    lineCount = totalLineCount;
+    lineCount = totalLineCount + 1;
 }
 
 void ForInstruction::execute() {
