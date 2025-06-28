@@ -20,11 +20,11 @@ public:
     bool loadFromFile();
     [[nodiscard]] int getNumCPUs() const;
     [[nodiscard]] SchedulerType getSchedulerType() const;
-    [[nodiscard]] uint32_t getQuantumCycles() const;
-    [[nodiscard]] uint32_t getBatchProcessFreq() const;
-    [[nodiscard]] uint32_t getMinInstructions() const;
-    [[nodiscard]] uint32_t getMaxInstructions() const;
-    [[nodiscard]] uint32_t getDelaysPerExec() const;
+    [[nodiscard]] uint64_t getQuantumCycles() const;
+    [[nodiscard]] uint64_t getBatchProcessFreq() const;
+    [[nodiscard]] uint64_t getMinInstructions() const;
+    [[nodiscard]] uint64_t getMaxInstructions() const;
+    [[nodiscard]] uint64_t getDelaysPerExec() const;
     void print() const;
 
 private:
