@@ -26,6 +26,11 @@ public:
     [[nodiscard]] uint64_t getMaxInstructions() const;
     [[nodiscard]] uint64_t getDelaysPerExec() const;
     void print() const;
+    [[nodiscard]] uint64_t getMaxOverallMem() const;
+    [[nodiscard]] uint64_t getMemPerFrame() const;
+    [[nodiscard]] uint64_t getMinMemPerProc() const;
+    [[nodiscard]] uint64_t getMaxMemPerProc() const;
+    [[nodiscard]] uint64_t getMemPerProc() const;
 
 private:
     // Private constructor to prevent instantiation
@@ -40,6 +45,13 @@ private:
     uint32_t minInstructions = 1000;
     uint32_t maxInstructions = 2000;
     uint32_t delaysPerExec = 0;
+
+    // New memory-related config values
+    uint32_t maxOverallMem = 1024;
+    uint32_t memPerFrame = 64;
+    uint32_t minMemPerProc = 64;
+    uint32_t maxMemPerProc = 1024;
+    uint32_t memPerProc = 64;
 
     bool delayEnabled = false;
 };
