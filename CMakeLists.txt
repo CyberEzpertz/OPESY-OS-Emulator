@@ -30,6 +30,8 @@ add_executable(os_emulator src/main.cpp
         src/InstructionFactory.cpp
         src/InstructionFactory.h
         src/IMemoryAllocator.h
+        src/FlatMemoryAllocator.cpp
+        src/FlatMemoryAllocator.h
 )
 
 set_property(TARGET os_emulator PROPERTY CXX_STANDARD 23)
