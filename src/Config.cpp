@@ -7,6 +7,7 @@
 #include <limits>
 #include <unordered_map>
 #include <cmath>
+#include <print>
 
 std::string stripQuotes(const std::string& input) {
     if (input.size() >= 2 && input.front() == '"' && input.back() == '"') {
@@ -22,7 +23,8 @@ Config& Config::getInstance() {
 }
 
 // Helper function to clamp memory values to the nearest valid power of 2
-uint64_t clampToValidMemoryValue(uint64_t value) {
+uint64_t clampToValidMemoryValue(uint64_t value, const std::string& paramName) {
+    uint64_t originalValue = value;
     value = std::clamp(value, uint64_t{64}, uint64_t{65536});
 
     if (value == 0) return 64;
@@ -30,6 +32,11 @@ uint64_t clampToValidMemoryValue(uint64_t value) {
     uint64_t result = 1;
     while (result <= value / 2) {
         result <<= 1;
+    }
+
+    if (originalValue != result) {
+        std::println("Warning: {} value {} is not a valid power of 2 in range [16, 65536]. Clamping to {}.",
+                 paramName, originalValue, result);
     }
 
     return result;
@@ -118,31 +125,31 @@ bool Config::loadFromFile() {
           [this](std::ifstream& f) {
               uint64_t value;
               f >> value;
-              maxOverallMem = clampToValidMemoryValue(value);
+              maxOverallMem = clampToValidMemoryValue(value, "max-overall-mem");
           }},
          {"mem-per-frame",
           [this](std::ifstream& f) {
               uint64_t value;
               f >> value;
-              memPerFrame = clampToValidMemoryValue(value);
+              memPerFrame = clampToValidMemoryValue(value, "mem-per-frame");
           }},
          {"min-mem-per-proc",
           [this](std::ifstream& f) {
               uint64_t value;
               f >> value;
-              minMemPerProc = clampToValidMemoryValue(value);
+              minMemPerProc = clampToValidMemoryValue(value, "min-mem-per-proc");
           }},
          {"max-mem-per-proc",
           [this](std::ifstream& f) {
               uint64_t value;
               f >> value;
-              maxMemPerProc = clampToValidMemoryValue(value);
+              maxMemPerProc = clampToValidMemoryValue(value, "max-mem-per-proc");
           }},
          {"mem-per-proc",
           [this](std::ifstream& f) {
               uint64_t value;
               f >> value;
-              memPerProc = clampToValidMemoryValue(value);
+              memPerProc = clampToValidMemoryValue(value, "mem-per-proc");
      }}};
 
     std::string key;
