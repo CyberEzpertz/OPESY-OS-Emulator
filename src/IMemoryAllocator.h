@@ -5,19 +5,17 @@
 
 #include "Screen.h"
 
+class Process;
 class IMemoryAllocator {
 public:
     virtual ~IMemoryAllocator() = default;
 
     // Tries to allocate memory for the given process.
     // Returns a pointer to the allocated memory or nullptr if allocation fails.
-    virtual void* allocate(size_t size, const std::string& processName, std::shared_ptr<Screen> process) = 0;
+    virtual void* allocate(size_t size, const std::string& processName, std::shared_ptr<Process> process) = 0;
 
     // Frees the memory previously assigned to the process.
-    virtual void deallocate(void* ptr, std::shared_ptr<Screen> process) = 0;
-
-    // Returns the base memory address previously allocated for the given process.
-    virtual void* getMemoryPtr(const std::string& processName) = 0;
+    virtual void deallocate(void* ptr, std::shared_ptr<Process> process) = 0;
 
     // Returns the memory usage of a specific process (0 if not allocated).
     [[nodiscard]] virtual size_t getProcessMemoryUsage(const std::string& processName) const = 0;
@@ -27,5 +25,5 @@ public:
 
     // Writes the current memory layout to memory_stamp_<quantumCycle>.txt,
     // displaying ranges for each process and free segment.
-    virtual void visualizeMemoryASCII(int quantumCycle) = 0;
+    virtual void visualizeMemory(int quantumCycle) = 0;
 };

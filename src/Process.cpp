@@ -121,8 +121,7 @@ void Process::setCurrentCore(const int coreId) {
 int Process::getCurrentCore() const {
     return currentCore.load();
 }
-void Process::setInstructions(
-    const std::vector<std::shared_ptr<Instruction>>& instructions) {
+void Process::setInstructions(const std::vector<std::shared_ptr<Instruction>>& instructions) {
     std::lock_guard lock(instructionsMutex);
     this->instructions = instructions;
     this->totalLines = 0;
@@ -181,8 +180,7 @@ void Process::exitScope() {
     if (!variableStack.empty()) {
         variableStack.pop_back();
     } else {
-        std::cout << ("Error: Tried to exit scope but scope stack is empty.")
-                  << std::endl;
+        std::cout << ("Error: Tried to exit scope but scope stack is empty.") << std::endl;
     }
 }
 
@@ -197,6 +195,15 @@ bool Process::declareVariable(const std::string& name, uint16_t value) {
     }
     currentScope[name] = value;
     return true;
+}
+uint64_t Process::getRequiredMemory() const {
+    return requiredMemory;
+}
+void Process::setBaseAddress(void* ptr) {
+    baseAddress = ptr;
+}
+void* Process::getBaseAddress() const {
+    return baseAddress;
 }
 
 /**
@@ -215,8 +222,7 @@ void Process::writeLogToFile() const {
         std::ofstream outFile(filename);
 
         if (!outFile.is_open()) {
-            std::cerr << "Error: Could not open log file for process "
-                      << processName << "\n";
+            std::cerr << "Error: Could not open log file for process " << processName << "\n";
             return;
         }
 
