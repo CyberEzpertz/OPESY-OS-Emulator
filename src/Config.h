@@ -51,7 +51,7 @@ private:
     uint32_t memPerFrame = 64;
     uint32_t minMemPerProc = 64;
     uint32_t maxMemPerProc = 1024;
-    uint32_t memPerProc = 64;
+    uint32_t memPerProc = 0;
 
     bool delayEnabled = false;
 };

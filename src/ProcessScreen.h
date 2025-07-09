@@ -1,12 +1,9 @@
 #pragma once
 
 #include <memory>
-#include <string>
-#include <vector>
 
 #include "Process.h"
 #include "Screen.h"
-
 
 /// @class ProcessScreen
 /// @brief A screen that displays and interacts with a specific process.

@@ -15,15 +15,17 @@
 
 #include "Config.h"
 
-Process::Process(const int id, const std::string& name)
+// Common constructor with all parameters
+Process::Process(const int id, const std::string& name, const uint64_t requiredMemory)
     : processID(id),
       processName(name),
       currentLine(0),
+      requiredMemory(requiredMemory),
       currentInstructionIndex(0),
       status(READY),
       currentCore(-1),
-      wakeupTick(0),
-      variableStack({{}}) {
+      variableStack({{}}),
+      wakeupTick(0) {
     totalLines = 0;
     for (const auto& instr : instructions) {
         totalLines += instr->getLineCount();
@@ -31,6 +33,11 @@ Process::Process(const int id, const std::string& name)
 
     timestamp = generateTimestamp();
 }
+
+// Convenience constructor that uses mem-per-proc from config
+Process::Process(const int id, const std::string& name) : Process(id, name, Config::getInstance().getMemPerProc()) {
+}
+
 /**
  * @brief Gets the unique identifier of the process.
  * @return Process ID.

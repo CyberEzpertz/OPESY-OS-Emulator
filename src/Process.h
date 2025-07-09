@@ -6,7 +6,6 @@
 
 #include <atomic>
 #include <shared_mutex>
-#include <stack>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -29,6 +28,7 @@ public:
      * @param name The name of the process.
      */
     Process(int id, const std::string& name);
+    Process(int id, const std::string& name, uint64_t requiredMemory);
 
     /**
      * @brief Gets the ID of the process.
@@ -114,7 +114,7 @@ private:
     int currentLine;                ///< Current line number being executed.
     int totalLines;                 ///< Total lines of code the process will execute.
     uint64_t requiredMemory;
-    void* baseAddress;
+    void* baseAddress = nullptr;
 
     int currentInstructionIndex;  ///< Current instruction being executed
     std::string timestamp;        ///< Timestamp when the process was created.
