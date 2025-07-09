@@ -12,7 +12,7 @@ public:
 
     // Tries to allocate memory for the given process.
     // Returns a pointer to the allocated memory or nullptr if allocation fails.
-    virtual void* allocate(size_t size, const std::string& processName, std::shared_ptr<Process> process) = 0;
+    virtual void* allocate(size_t size, std::shared_ptr<Process> process) = 0;
 
     // Frees the memory previously assigned to the process.
     virtual void deallocate(void* ptr, std::shared_ptr<Process> process) = 0;

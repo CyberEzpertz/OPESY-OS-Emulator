@@ -9,23 +9,26 @@ FlatMemoryAllocator& FlatMemoryAllocator::getInstance() {
     return instance;
 }
 
-void* FlatMemoryAllocator::allocate(const size_t size, const std::string& processName,
-                                    std::shared_ptr<Process> process) {
+void* FlatMemoryAllocator::allocate(const size_t size, std::shared_ptr<Process> process) {
     std::lock_guard lock(memoryMutex);
 
     // Loop through memory from index 0 to (maximumSize - size)
     for (size_t i = 0; i <= maximumSize - size; ++i) {
         if (canAllocateAt(i, size)) {
-            allocateAt(i, size, processName);
+            allocateAt(i, size, process->getName());
             allocatedSize += size;
 
-            return &memoryView[i];  // Return pointer to the allocated block
+            void* baseAddress = &memoryView[i];
+            process->setBaseAddress(baseAddress);
+
+            return baseAddress;  // Return pointer to the allocated block
         }
     }
 
     // No space available
     return nullptr;
 }
+
 void FlatMemoryAllocator::deallocate(void* ptr, const std::shared_ptr<Process> process) {
     const auto memIdx = static_cast<char*>(ptr) - &memoryView[0];
 
@@ -54,9 +57,8 @@ size_t FlatMemoryAllocator::getMaximumSize() const {
 FlatMemoryAllocator::FlatMemoryAllocator() : allocatedSize(0) {
     // This is assuming config either has a default or has been initialized
     maximumSize = Config::getInstance().getMaxOverallMem();
-    memoryView.reserve(maximumSize);
-    memoryMap.reserve(maximumSize);
-    initialize();
+    memoryView.resize(maximumSize, '.');
+    memoryMap.resize(maximumSize, "");
 }
 
 bool FlatMemoryAllocator::canAllocateAt(const size_t index, const size_t size) const {
@@ -86,8 +88,4 @@ void FlatMemoryAllocator::deallocateAt(const size_t index, const size_t size) {
     std::ranges::fill(memoryMap.begin() + index, memoryMap.begin() + index + size, "");
     std::ranges::fill(memoryView.begin() + index, memoryView.begin() + index + size, '.');
     allocatedSize -= size;
-}
-void FlatMemoryAllocator::initialize() {
-    std::ranges::fill(memoryMap.begin(), memoryMap.end(), "");
-    std::ranges::fill(memoryView.begin(), memoryView.end(), '.');
 }
