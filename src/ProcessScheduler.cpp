@@ -6,6 +6,7 @@
 
 #include "ConsoleManager.h"
 #include "Process.h"
+#include "FlatMemoryAllocator.h"  // Add this include
 
 using namespace std::chrono_literals;
 
@@ -17,6 +18,8 @@ ProcessScheduler& ProcessScheduler::getInstance() {
 ProcessScheduler::ProcessScheduler() {
     this->numCpuCores = Config::getInstance().getNumCPUs();
     this->availableCores = Config::getInstance().getNumCPUs();
+    // Initialize memory allocator
+    this->memoryAllocator = &FlatMemoryAllocator::getInstance();
 };
 
 ProcessScheduler::~ProcessScheduler() {
@@ -121,6 +124,8 @@ void ProcessScheduler::incrementCpuCycles() {
 
             if (proc->getIsFinished()) {
                 proc->setStatus(DONE);
+                // Deallocate memory for finished process
+                deallocateProcessMemory(proc);
             } else {
                 proc->setStatus(READY);
                 scheduleProcess(proc);
@@ -162,7 +167,7 @@ void ProcessScheduler::dummyGeneratorLoop() {
     uint64_t lastCycle = getCurrentCycle();
 
     while (generatingDummies) {
-        // wait until either: (a) we’re told to stop, or (b) enough ticks passed
+        // wait until either: (a) we're told to stop, or (b) enough ticks passed
         {
             std::unique_lock lock(tickMutex);
             tickCv.wait(lock, [&] {
@@ -253,6 +258,41 @@ void ProcessScheduler::executeRR(std::shared_ptr<Process>& proc,
         cyclesExecuted >= quantumCycles) {
         proc->setStatus(READY);
         scheduleProcess(proc);  // Put back at end of ready queue
+        // Note: Memory remains allocated during preemption
+    }
+}
+
+// New method to attempt memory allocation for a process
+bool ProcessScheduler::tryAllocateMemory(std::shared_ptr<Process>& proc) {
+    // Check if process already has memory allocated
+    if (proc->getBaseAddress() != nullptr) {
+        return true;  // Memory already allocated
+    }
+
+    // Attempt to allocate memory
+    void* allocatedMemory = memoryAllocator->allocate(proc->getRequiredMemory(), proc);
+
+    if (allocatedMemory != nullptr) {
+        // Memory allocation successful
+        proc->setBaseAddress(allocatedMemory);
+        std::println("Process {} allocated {} bytes of memory at address {}",
+                     proc->getName(), proc->getRequiredMemory(), allocatedMemory);
+        return true;
+    } else {
+        // Memory allocation failed
+        std::println("Process {} failed to allocate {} bytes of memory",
+                     proc->getName(), proc->getRequiredMemory());
+        return false;
+    }
+}
+
+// New method to deallocate memory for a process
+void ProcessScheduler::deallocateProcessMemory(std::shared_ptr<Process>& proc) {
+    if (proc->getBaseAddress() != nullptr) {
+        memoryAllocator->deallocate(proc->getBaseAddress(), proc);
+        std::println("Process {} deallocated memory at address {}",
+                     proc->getName(), proc->getBaseAddress());
+        proc->setBaseAddress(nullptr);
     }
 }
 
@@ -275,9 +315,18 @@ void ProcessScheduler::workerLoop(const int coreId) {
                 proc = readyQueue.front();
                 readyQueue.pop_front();
 
-                proc->setStatus(RUNNING);
-                proc->setCurrentCore(coreId);
-                availableCores -= 1;
+                // CRITICAL: Attempt memory allocation before running the process
+                if (tryAllocateMemory(proc)) {
+                    // Memory allocation successful - proceed with execution
+                    proc->setStatus(RUNNING);
+                    proc->setCurrentCore(coreId);
+                    availableCores -= 1;
+                } else {
+                    // Memory allocation failed - move process to back of ready queue
+                    readyQueue.push_back(proc);
+                    proc = nullptr;  // Don't execute this process
+                    continue;  // Try next process in queue
+                }
             }
         }
 
@@ -291,8 +340,16 @@ void ProcessScheduler::workerLoop(const int coreId) {
             executeRR(proc, lastTickSeen);
         }
 
-        // Reset current core to none
+        // Handle process completion or cleanup
         if (proc) {
+            // Check if process is finished
+            if (proc->getIsFinished()) {
+                proc->setStatus(DONE);
+                // Deallocate memory for completed process
+                deallocateProcessMemory(proc);
+            }
+
+            // Reset current core to none
             proc->setCurrentCore(-1);
             proc = nullptr;
             availableCores += 1;

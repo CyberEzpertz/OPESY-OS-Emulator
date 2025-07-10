@@ -12,6 +12,9 @@
 #include "Config.h"
 #include "Process.h"
 
+// Forward declaration
+class FlatMemoryAllocator;
+
 // For the min-heap waiting queue
 struct WakeupComparator {
     bool operator()(const std::shared_ptr<Process>& a,
@@ -52,6 +55,10 @@ private:
     void executeFCFS(std::shared_ptr<Process>& proc, uint64_t& lastTickSeen);
     void executeRR(std::shared_ptr<Process>& proc, uint64_t& lastTickSeen);
 
+    // Memory management methods
+    bool tryAllocateMemory(std::shared_ptr<Process>& proc);
+    void deallocateProcessMemory(std::shared_ptr<Process>& proc);
+
     int numCpuCores;
     std::atomic<int> availableCores;
 
@@ -75,4 +82,7 @@ private:
     std::atomic<bool> generatingDummies{false};
 
     std::thread tickThread;
+
+    // Memory allocator
+    FlatMemoryAllocator* memoryAllocator;
 };
