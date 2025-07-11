@@ -34,6 +34,7 @@ void FlatMemoryAllocator::deallocate(void* ptr, const std::shared_ptr<Process> p
 
     // Double check if it's inside the memoryMap itself
     if (!memoryMap[memIdx].empty()) {
+        process->setBaseAddress(nullptr);
         deallocateAt(memIdx, process->getRequiredMemory());
     }
 }

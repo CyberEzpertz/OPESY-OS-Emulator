@@ -12,13 +12,9 @@
 #include "Config.h"
 #include "Process.h"
 
-// Forward declaration
-class FlatMemoryAllocator;
-
 // For the min-heap waiting queue
 struct WakeupComparator {
-    bool operator()(const std::shared_ptr<Process>& a,
-                    const std::shared_ptr<Process>& b) const {
+    bool operator()(const std::shared_ptr<Process>& a, const std::shared_ptr<Process>& b) const {
         return a->getWakeupTick() > b->getWakeupTick();
     }
 };
@@ -52,12 +48,12 @@ private:
     void workerLoop(int coreId);
     void incrementCpuCycles();
     void dummyGeneratorLoop();
-    void executeFCFS(std::shared_ptr<Process>& proc, uint64_t& lastTickSeen);
-    void executeRR(std::shared_ptr<Process>& proc, uint64_t& lastTickSeen);
+    void executeFCFS(const std::shared_ptr<Process>& proc, uint64_t& lastTickSeen);
+    void executeRR(const std::shared_ptr<Process>& proc, uint64_t& lastTickSeen);
 
     // Memory management methods
     bool tryAllocateMemory(std::shared_ptr<Process>& proc);
-    void deallocateProcessMemory(std::shared_ptr<Process>& proc);
+    void deallocateProcessMemory(const std::shared_ptr<Process>& proc) const;
 
     int numCpuCores;
     std::atomic<int> availableCores;
@@ -66,9 +62,7 @@ private:
     std::condition_variable readyCv;
     std::mutex readyMutex;
 
-    std::priority_queue<std::shared_ptr<Process>,
-                        std::vector<std::shared_ptr<Process>>, WakeupComparator>
-        waitQueue;
+    std::priority_queue<std::shared_ptr<Process>, std::vector<std::shared_ptr<Process>>, WakeupComparator> waitQueue;
     std::mutex waitMutex;
 
     std::condition_variable tickCv;
@@ -82,7 +76,4 @@ private:
     std::atomic<bool> generatingDummies{false};
 
     std::thread tickThread;
-
-    // Memory allocator
-    FlatMemoryAllocator* memoryAllocator;
 };

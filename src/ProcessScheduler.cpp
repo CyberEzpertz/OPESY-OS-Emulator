@@ -5,8 +5,8 @@
 #include <thread>
 
 #include "ConsoleManager.h"
-#include "Process.h"
 #include "FlatMemoryAllocator.h"  // Add this include
+#include "Process.h"
 
 using namespace std::chrono_literals;
 
@@ -18,8 +18,6 @@ ProcessScheduler& ProcessScheduler::getInstance() {
 ProcessScheduler::ProcessScheduler() {
     this->numCpuCores = Config::getInstance().getNumCPUs();
     this->availableCores = Config::getInstance().getNumCPUs();
-    // Initialize memory allocator
-    this->memoryAllocator = &FlatMemoryAllocator::getInstance();
 };
 
 ProcessScheduler::~ProcessScheduler() {
@@ -76,8 +74,7 @@ void ProcessScheduler::initialize() {
     this->availableCores = Config::getInstance().getNumCPUs();
 }
 
-void ProcessScheduler::scheduleProcess(
-    const std::shared_ptr<Process>& process) {
+void ProcessScheduler::scheduleProcess(const std::shared_ptr<Process>& process) {
     {
         std::lock_guard lock(readyMutex);
         readyQueue.push_back(process);
@@ -114,8 +111,7 @@ void ProcessScheduler::incrementCpuCycles() {
     {
         std::lock_guard lock(waitMutex);
 
-        while (!waitQueue.empty() &&
-               waitQueue.top()->getWakeupTick() <= cpuCycles) {
+        while (!waitQueue.empty() && waitQueue.top()->getWakeupTick() <= cpuCycles) {
             auto proc = waitQueue.top();
             waitQueue.pop();
 
@@ -143,10 +139,8 @@ void ProcessScheduler::startDummyGeneration() {
     }
 
     generatingDummies = true;
-    dummyGeneratorThread =
-        std::thread(&ProcessScheduler::dummyGeneratorLoop, this);
-    std::println("Started dummy process generation every {} CPU cycles.",
-                 Config::getInstance().getBatchProcessFreq());
+    dummyGeneratorThread = std::thread(&ProcessScheduler::dummyGeneratorLoop, this);
+    std::println("Started dummy process generation every {} CPU cycles.", Config::getInstance().getBatchProcessFreq());
 }
 
 void ProcessScheduler::stopDummyGeneration() {
@@ -163,17 +157,14 @@ void ProcessScheduler::stopDummyGeneration() {
 }
 
 void ProcessScheduler::dummyGeneratorLoop() {
-    const int interval = Config::getInstance().getBatchProcessFreq();
+    const auto interval = Config::getInstance().getBatchProcessFreq();
     uint64_t lastCycle = getCurrentCycle();
 
     while (generatingDummies) {
         // wait until either: (a) we're told to stop, or (b) enough ticks passed
         {
             std::unique_lock lock(tickMutex);
-            tickCv.wait(lock, [&] {
-                return !generatingDummies ||
-                       (getCurrentCycle() - lastCycle) >= interval;
-            });
+            tickCv.wait(lock, [&] { return !generatingDummies || (getCurrentCycle() - lastCycle) >= interval; });
         }
 
         if (!generatingDummies)
@@ -201,21 +192,19 @@ void ProcessScheduler::printQueues() const {
 
 void ProcessScheduler::tickLoop() {
     while (running) {
-        // std::this_thread::sleep_for(1ms);  // Simulate one tick every 50ms
+        std::this_thread::sleep_for(100ms);  // Simulate one tick every 50ms
         incrementCpuCycles();
     }
 }
 
-void ProcessScheduler::executeFCFS(std::shared_ptr<Process>& proc,
-                                   uint64_t& lastTickSeen) {
+void ProcessScheduler::executeFCFS(const std::shared_ptr<Process>& proc, uint64_t& lastTickSeen) {
     // FCFS: Run until process is finished or blocked
     const uint32_t delayCycles = Config::getInstance().getDelaysPerExec();
     while (proc && proc->getStatus() == RUNNING) {
         // Wait for next tick before executing next instruction
         {
             std::unique_lock lock(tickMutex);
-            tickCv.wait(lock,
-                        [&] { return cpuCycles > lastTickSeen || !running; });
+            tickCv.wait(lock, [&] { return cpuCycles > lastTickSeen || !running; });
 
             if (!running)
                 break;
@@ -228,19 +217,16 @@ void ProcessScheduler::executeFCFS(std::shared_ptr<Process>& proc,
     }
 }
 
-void ProcessScheduler::executeRR(std::shared_ptr<Process>& proc,
-                                 uint64_t& lastTickSeen) {
+void ProcessScheduler::executeRR(const std::shared_ptr<Process>& proc, uint64_t& lastTickSeen) {
     // Round Robin: Run for quantum cycles or until finished/blocked
     uint32_t cyclesExecuted = 0;
-    const uint32_t delayCycles   = Config::getInstance().getDelaysPerExec();
+    const uint32_t delayCycles = Config::getInstance().getDelaysPerExec();
     const auto quantumCycles = Config::getInstance().getQuantumCycles();
-    while (proc && proc->getStatus() == RUNNING &&
-           cyclesExecuted < quantumCycles) {
+    while (proc && proc->getStatus() == RUNNING && cyclesExecuted < quantumCycles) {
         // Wait for next tick before executing next instruction
         {
             std::unique_lock lock(tickMutex);
-            tickCv.wait(lock,
-                        [&] { return cpuCycles > lastTickSeen || !running; });
+            tickCv.wait(lock, [&] { return cpuCycles > lastTickSeen || !running; });
 
             if (!running)
                 break;
@@ -254,8 +240,7 @@ void ProcessScheduler::executeRR(std::shared_ptr<Process>& proc,
     }
 
     // If process used full quantum and is still running, preempt it
-    if (proc && proc->getStatus() == RUNNING &&
-        cyclesExecuted >= quantumCycles) {
+    if (proc && proc->getStatus() == RUNNING && cyclesExecuted >= quantumCycles) {
         proc->setStatus(READY);
         scheduleProcess(proc);  // Put back at end of ready queue
         // Note: Memory remains allocated during preemption
@@ -270,29 +255,29 @@ bool ProcessScheduler::tryAllocateMemory(std::shared_ptr<Process>& proc) {
     }
 
     // Attempt to allocate memory
-    void* allocatedMemory = memoryAllocator->allocate(proc->getRequiredMemory(), proc);
+    const void* allocatedMemory = FlatMemoryAllocator::getInstance().allocate(proc->getRequiredMemory(), proc);
 
-    if (allocatedMemory != nullptr) {
-        // Memory allocation successful
-        proc->setBaseAddress(allocatedMemory);
-        std::println("Process {} allocated {} bytes of memory at address {}",
-                     proc->getName(), proc->getRequiredMemory(), allocatedMemory);
-        return true;
-    } else {
+    if (allocatedMemory == nullptr) {
         // Memory allocation failed
-        std::println("Process {} failed to allocate {} bytes of memory",
-                     proc->getName(), proc->getRequiredMemory());
-        return false;
+        // For debugging
+        std::println("Process {} failed to allocate {} bytes of memory", proc->getName(), proc->getRequiredMemory());
+    } else {
+        // Memory allocation successful
+        // For debugging
+        std::println("Process {} allocated {} bytes of memory at address {}", proc->getName(),
+                     proc->getRequiredMemory(), allocatedMemory);
     }
+
+    return allocatedMemory != nullptr;
 }
 
 // New method to deallocate memory for a process
-void ProcessScheduler::deallocateProcessMemory(std::shared_ptr<Process>& proc) {
+void ProcessScheduler::deallocateProcessMemory(const std::shared_ptr<Process>& proc) const {
     if (proc->getBaseAddress() != nullptr) {
-        memoryAllocator->deallocate(proc->getBaseAddress(), proc);
-        std::println("Process {} deallocated memory at address {}",
-                     proc->getName(), proc->getBaseAddress());
-        proc->setBaseAddress(nullptr);
+        FlatMemoryAllocator::getInstance().deallocate(proc->getBaseAddress(), proc);
+
+        // For debugging
+        // std::println("Process {} deallocated memory at address {}", proc->getName(), proc->getBaseAddress());
     }
 }
 
@@ -325,7 +310,7 @@ void ProcessScheduler::workerLoop(const int coreId) {
                     // Memory allocation failed - move process to back of ready queue
                     readyQueue.push_back(proc);
                     proc = nullptr;  // Don't execute this process
-                    continue;  // Try next process in queue
+                    continue;        // Try next process in queue
                 }
             }
         }
