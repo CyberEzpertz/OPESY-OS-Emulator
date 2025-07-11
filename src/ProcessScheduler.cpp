@@ -260,12 +260,12 @@ bool ProcessScheduler::tryAllocateMemory(std::shared_ptr<Process>& proc) {
     if (allocatedMemory == nullptr) {
         // Memory allocation failed
         // For debugging
-        std::println("Process {} failed to allocate {} bytes of memory", proc->getName(), proc->getRequiredMemory());
+        // std::println("Process {} failed to allocate {} bytes of memory", proc->getName(), proc->getRequiredMemory());
     } else {
         // Memory allocation successful
         // For debugging
-        std::println("Process {} allocated {} bytes of memory at address {}", proc->getName(),
-                     proc->getRequiredMemory(), allocatedMemory);
+        // std::println("Process {} allocated {} bytes of memory at address {}", proc->getName(),
+        // proc->getRequiredMemory(), allocatedMemory);
     }
 
     return allocatedMemory != nullptr;
