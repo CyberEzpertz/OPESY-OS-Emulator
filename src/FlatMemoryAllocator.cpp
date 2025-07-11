@@ -82,21 +82,7 @@ void FlatMemoryAllocator::visualizeMemory(int quantumCycle) {
         }
     }
 
-    // Compute external fragmentation
-    size_t externalFrag = 0;
-    size_t i = 0;
-    while (i < maximumSize) {
-        if (memoryView[i] == '.') {
-            size_t freeBlockSize = 0;
-            while (i < maximumSize && memoryView[i] == '.') {
-                ++freeBlockSize;
-                ++i;
-            }
-            externalFrag += freeBlockSize;
-        } else {
-            ++i;
-        }
-    }
+    size_t externalFrag = maximumSize - allocatedSize;
 
     // Header Info
     outFile << "Timestamp: " << timestamp.str() << "\n";
@@ -105,7 +91,7 @@ void FlatMemoryAllocator::visualizeMemory(int quantumCycle) {
 
     // Memory layout (descending order)
     outFile << "Memory Layout:\n";
-    outFile << "---end--- = " << maximumSize << " KB\n";
+    outFile << "---end--- = " << maximumSize << " \n";
 
     size_t index = maximumSize;
     while (index > 0) {
@@ -126,10 +112,10 @@ void FlatMemoryAllocator::visualizeMemory(int quantumCycle) {
 
         outFile << blockEnd << " KB\n";
         outFile << (isFree ? "FREE" : label) << "\n";
-        outFile << (blockEnd - blockSize) << " KB\n\n";
+        outFile << (blockEnd - blockSize) << " \n\n";
     }
 
-    outFile << "---start--- = 0 KB\n";
+    outFile << "---start--- = 0 \n";
 
     outFile.close();
 }
