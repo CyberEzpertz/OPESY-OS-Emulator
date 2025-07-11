@@ -191,9 +191,13 @@ void ProcessScheduler::printQueues() const {
 }
 
 void ProcessScheduler::tickLoop() {
+    const auto quantumTicks = Config::getInstance().getQuantumCycles(); // quantum as number of ticks
     while (running) {
         std::this_thread::sleep_for(100ms);  // Simulate one tick every 50ms
         incrementCpuCycles();
+        if (quantumTicks > 0 && getCurrentCycle() % quantumTicks == 0) {
+            FlatMemoryAllocator::getInstance().visualizeMemory(getCurrentCycle());
+        }
     }
 }
 
