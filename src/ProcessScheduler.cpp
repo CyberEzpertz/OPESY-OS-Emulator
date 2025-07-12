@@ -11,8 +11,8 @@
 using namespace std::chrono_literals;
 
 ProcessScheduler& ProcessScheduler::getInstance() {
-    static ProcessScheduler instance;
-    return instance;
+    static auto* instance = new ProcessScheduler();
+    return *instance;
 }
 
 ProcessScheduler::ProcessScheduler() {

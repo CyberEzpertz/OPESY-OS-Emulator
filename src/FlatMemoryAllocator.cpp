@@ -14,9 +14,9 @@
 #include "Process.h"
 
 FlatMemoryAllocator& FlatMemoryAllocator::getInstance() {
-    static FlatMemoryAllocator instance;
+    static auto* instance = new FlatMemoryAllocator();
 
-    return instance;
+    return *instance;
 }
 
 void* FlatMemoryAllocator::allocate(const size_t size, std::shared_ptr<Process> process) {
