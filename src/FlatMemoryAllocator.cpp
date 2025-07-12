@@ -26,7 +26,6 @@ void* FlatMemoryAllocator::allocate(const size_t size, std::shared_ptr<Process> 
     for (size_t i = 0; i <= maximumSize - size; ++i) {
         if (canAllocateAt(i, size)) {
             allocateAt(i, size, process->getName());
-            allocatedSize += size;
 
             void* baseAddress = &memoryView[i];
             process->setBaseAddress(baseAddress);
@@ -92,6 +91,8 @@ void FlatMemoryAllocator::visualizeMemory(int quantumCycle) {
     outFile << "Timestamp: " << timestamp.str() << "\n";
     outFile << "Number of processes in memory: " << processNames.size() << "\n";
     outFile << "Total external fragmentation in KB: " << externalFrag << "\n\n";
+    outFile << "Max: " << maximumSize << "\n\n";
+    outFile << "Allocated: " << allocatedSize << "\n\n";
 
     // Memory layout (descending order)
     outFile << "Memory Layout:\n";
@@ -113,7 +114,7 @@ void FlatMemoryAllocator::visualizeMemory(int quantumCycle) {
             ++blockSize;
         }
 
-        outFile << blockEnd << " KB\n";
+        outFile << blockEnd << " \n";
         outFile << (isFree ? "FREE" : label) << "\n";
         outFile << (blockEnd - blockSize) << " \n\n";
     }
