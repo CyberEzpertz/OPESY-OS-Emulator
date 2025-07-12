@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <mutex>
+#include <shared_mutex>
 #include <string>
 #include <vector>
 
@@ -26,8 +27,7 @@ public:
     void visualizeMemory(int quantumCycle) override;
 
     // Getters
-    size_t getAllocatedSize() const;
-    size_t getMaximumSize() const;
+    size_t getMaximumMemory() const;
 
 private:
     FlatMemoryAllocator();
@@ -36,7 +36,7 @@ private:
     size_t allocatedSize;
     std::vector<char> memoryView;
     std::vector<std::string> memoryMap;
-    std::mutex memoryMutex;
+    mutable std::shared_mutex memoryMutex;
 
     [[nodiscard]] bool canAllocateAt(size_t index, size_t size) const;
     void allocateAt(size_t index, size_t size, const std::string& processName);
