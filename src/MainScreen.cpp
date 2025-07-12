@@ -1,6 +1,8 @@
 #include "MainScreen.h"
 
 #include <algorithm>
+#include <filesystem>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <print>
@@ -8,8 +10,6 @@
 #include <sstream>
 #include <string>
 #include <vector>
-#include <fstream>
-#include <filesystem>
 
 #include "ConsoleManager.h"
 #include "ProcessScheduler.h"
@@ -67,7 +67,7 @@ __________                         .__       ________    _________
 /// - "screen -s <name>": Placeholder for creating a new screen.
 /// - "screen -r <name>": Placeholder for resuming a screen.
 /// - "screen -ls": Displays the processes
-/// - "scheduler-test", "scheduler-stop", "report-util", "initialize":
+/// - "scheduler-start", "scheduler-stop", "report-util", "initialize":
 /// Placeholders for other commands.
 ///
 /// If the command is unrecognized, prints an error message.
@@ -116,7 +116,7 @@ void MainScreen::handleUserInput() {
         handleScreenCommand(tokens);
     } else if (cmd == "initialize") {
         std::println("Program has already been initialized.");
-    } else if (cmd == "scheduler-test") {
+    } else if (cmd == "scheduler-start") {
         ProcessScheduler& scheduler = ProcessScheduler::getInstance();
         if (scheduler.isGeneratingDummies()) {
             std::println("Dummy process generation is already running.");
@@ -136,10 +136,8 @@ void MainScreen::handleUserInput() {
         ProcessScheduler& scheduler = ProcessScheduler::getInstance();
         std::println("Scheduler Status:");
         std::println("- CPU Cycles: {}", scheduler.getCurrentCycle());
-        std::println("- Dummy Generation: {}",
-                     scheduler.isGeneratingDummies() ? "Running" : "Stopped");
-        std::println("- Available Cores: {}/{}",
-                     scheduler.getNumAvailableCores(), scheduler.getNumTotalCores());
+        std::println("- Dummy Generation: {}", scheduler.isGeneratingDummies() ? "Running" : "Stopped");
+        std::println("- Available Cores: {}/{}", scheduler.getNumAvailableCores(), scheduler.getNumTotalCores());
         scheduler.printQueues();
     } else if (cmd == "report-util") {
         generateUtilizationReport();
@@ -213,8 +211,7 @@ void MainScreen::printProcessReport() {
 
     int availableCores = scheduler.getNumAvailableCores();
     int numCores = scheduler.getNumTotalCores();
-    double cpuUtil =
-        static_cast<double>(numCores - availableCores) / numCores * 100.0;
+    double cpuUtil = static_cast<double>(numCores - availableCores) / numCores * 100.0;
 
     auto processes = ConsoleManager::getInstance().getProcessNameMap();
 
@@ -224,9 +221,7 @@ void MainScreen::printProcessReport() {
         sorted.push_back(proc);
     }
 
-    std::ranges::sort(sorted, [](const auto& a, const auto& b) {
-        return a->getName() < b->getName();
-    });
+    std::ranges::sort(sorted, [](const auto& a, const auto& b) { return a->getName() < b->getName(); });
 
     std::println("CPU Utilization: {:.0f}%", cpuUtil);
     std::println("Cores used: {}", numCores - availableCores);
@@ -239,13 +234,9 @@ void MainScreen::printProcessReport() {
 
     for (const auto& process : sorted) {
         if (process->getStatus() == WAITING) {
-            std::string coreStr =
-                (process->getCurrentCore() == -1)
-                    ? "N/A"
-                    : std::to_string(process->getCurrentCore());
+            std::string coreStr = (process->getCurrentCore() == -1) ? "N/A" : std::to_string(process->getCurrentCore());
 
-            std::println("{:<10}\t({:<8})\tCore:\t{:<4}\t{} / {}",
-                         process->getName(), process->getTimestamp(), coreStr,
+            std::println("{:<10}\t({:<8})\tCore:\t{:<4}\t{} / {}", process->getName(), process->getTimestamp(), coreStr,
                          process->getCurrentLine(), process->getTotalLines());
         }
     }
@@ -254,13 +245,9 @@ void MainScreen::printProcessReport() {
 
     for (const auto& process : sorted) {
         if (process->getStatus() != DONE && process->getStatus() != WAITING) {
-            std::string coreStr =
-                (process->getCurrentCore() == -1)
-                    ? "N/A"
-                    : std::to_string(process->getCurrentCore());
+            std::string coreStr = (process->getCurrentCore() == -1) ? "N/A" : std::to_string(process->getCurrentCore());
 
-            std::println("{:<10}\t({:<8})\tCore:\t{:<4}\t{} / {}",
-                         process->getName(), process->getTimestamp(), coreStr,
+            std::println("{:<10}\t({:<8})\tCore:\t{:<4}\t{} / {}", process->getName(), process->getTimestamp(), coreStr,
                          process->getCurrentLine(), process->getTotalLines());
         }
     }
@@ -269,8 +256,7 @@ void MainScreen::printProcessReport() {
 
     for (const auto& process : sorted) {
         if (process->getStatus() == DONE) {
-            std::println("{:<10}\t({:<8})\tFinished\t{} / {}",
-                         process->getName(), process->getTimestamp(),
+            std::println("{:<10}\t({:<8})\tFinished\t{} / {}", process->getName(), process->getTimestamp(),
                          process->getCurrentLine(), process->getTotalLines());
         }
     }
@@ -294,9 +280,7 @@ void MainScreen::generateUtilizationReport() {
             sorted.push_back(proc);
         }
 
-        std::ranges::sort(sorted, [](const auto& a, const auto& b) {
-            return a->getName() < b->getName();
-        });
+        std::ranges::sort(sorted, [](const auto& a, const auto& b) { return a->getName() < b->getName(); });
 
         // Generate timestamp
         auto now = std::chrono::system_clock::now();
@@ -328,12 +312,10 @@ void MainScreen::generateUtilizationReport() {
         outFile << "Waiting Processes:\n";
         for (const auto& process : sorted) {
             if (process->getStatus() == WAITING) {
-                std::string coreStr = (process->getCurrentCore() == -1)
-                    ? "N/A"
-                    : std::to_string(process->getCurrentCore());
+                std::string coreStr =
+                    (process->getCurrentCore() == -1) ? "N/A" : std::to_string(process->getCurrentCore());
 
-                outFile << process->getName() << "\t(" << process->getTimestamp()
-                        << ")\tCore:\t" << coreStr << "\t"
+                outFile << process->getName() << "\t(" << process->getTimestamp() << ")\tCore:\t" << coreStr << "\t"
                         << process->getCurrentLine() << " / " << process->getTotalLines() << "\n";
             }
         }
@@ -341,12 +323,10 @@ void MainScreen::generateUtilizationReport() {
         outFile << "\nRunning processes:\n";
         for (const auto& process : sorted) {
             if (process->getStatus() != DONE && process->getStatus() != WAITING) {
-                std::string coreStr = (process->getCurrentCore() == -1)
-                    ? "N/A"
-                    : std::to_string(process->getCurrentCore());
+                std::string coreStr =
+                    (process->getCurrentCore() == -1) ? "N/A" : std::to_string(process->getCurrentCore());
 
-                outFile << process->getName() << "\t(" << process->getTimestamp()
-                        << ")\tCore:\t" << coreStr << "\t"
+                outFile << process->getName() << "\t(" << process->getTimestamp() << ")\tCore:\t" << coreStr << "\t"
                         << process->getCurrentLine() << " / " << process->getTotalLines() << "\n";
             }
         }
@@ -354,9 +334,8 @@ void MainScreen::generateUtilizationReport() {
         outFile << "\nFinished processes:\n";
         for (const auto& process : sorted) {
             if (process->getStatus() == DONE) {
-                outFile << process->getName() << "\t(" << process->getTimestamp()
-                        << ")\tFinished\t" << process->getCurrentLine()
-                        << " / " << process->getTotalLines() << "\n";
+                outFile << process->getName() << "\t(" << process->getTimestamp() << ")\tFinished\t"
+                        << process->getCurrentLine() << " / " << process->getTotalLines() << "\n";
             }
         }
 
