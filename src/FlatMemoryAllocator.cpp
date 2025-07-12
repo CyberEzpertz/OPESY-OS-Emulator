@@ -91,8 +91,8 @@ void FlatMemoryAllocator::visualizeMemory(int quantumCycle) {
     outFile << "Timestamp: " << timestamp.str() << "\n";
     outFile << "Number of processes in memory: " << processNames.size() << "\n";
     outFile << "Total external fragmentation in KB: " << externalFrag << "\n\n";
-    outFile << "Max: " << maximumSize << "\n\n";
-    outFile << "Allocated: " << allocatedSize << "\n\n";
+    // outFile << "Max: " << maximumSize << "\n\n";
+    // outFile << "Allocated: " << allocatedSize << "\n\n";
 
     // Memory layout (descending order)
     outFile << "Memory Layout:\n";
