@@ -1,5 +1,15 @@
 #include "FlatMemoryAllocator.h"
 
+#include <chrono>
+#include <ctime>
+#include <filesystem>
+#include <format>
+#include <fstream>
+#include <iomanip>
+#include <iostream>
+#include <sstream>
+#include <unordered_set>
+
 #include "Config.h"
 #include "Process.h"
 
@@ -46,8 +56,70 @@ size_t FlatMemoryAllocator::getTotalMemoryUsage() const {
     return allocatedSize;
 }
 void FlatMemoryAllocator::visualizeMemory(int quantumCycle) {
-    // TODO: Create this with details for Issue #56
+    std::lock_guard lock(memoryMutex);
+
+    // Build filename
+    std::string filename = std::format("logs/memory_stamp_{}.txt", quantumCycle);
+    std::filesystem::create_directories("logs");  // 🔥 Fix: Create logs/ folder if missing
+    std::ofstream outFile(filename);
+    if (!outFile.is_open()) {
+        std::cerr << "Error: Could not write memory snapshot to " << filename << "\n";
+        return;
+    }
+
+    // Generate timestamp
+    auto now = std::chrono::system_clock::now();
+    std::time_t timeT = std::chrono::system_clock::to_time_t(now);
+    std::tm local_tm = *std::localtime(&timeT);
+    std::ostringstream timestamp;
+    timestamp << std::put_time(&local_tm, "%m/%d/%Y %I:%M:%S %p");
+
+    // Count processes in memory
+    std::unordered_set<std::string> processNames;
+    for (const auto& name : memoryMap) {
+        if (!name.empty()) {
+            processNames.insert(name);
+        }
+    }
+
+    size_t externalFrag = maximumSize - allocatedSize;
+
+    // Header Info
+    outFile << "Timestamp: " << timestamp.str() << "\n";
+    outFile << "Number of processes in memory: " << processNames.size() << "\n";
+    outFile << "Total external fragmentation in KB: " << externalFrag << "\n\n";
+
+    // Memory layout (descending order)
+    outFile << "Memory Layout:\n";
+    outFile << "---end--- = " << maximumSize << " \n";
+
+    size_t index = maximumSize;
+    while (index > 0) {
+        size_t blockEnd = index;
+        std::string label = memoryMap[index - 1];
+        bool isFree = label.empty();
+
+        size_t blockSize = 0;
+        while (index > 0) {
+            --index;
+            if ((memoryMap[index].empty() && !isFree) ||
+                (!memoryMap[index].empty() && (memoryMap[index] != label))) {
+                ++index;  // step back to the last correct index
+                break;
+            }
+            ++blockSize;
+        }
+
+        outFile << blockEnd << " KB\n";
+        outFile << (isFree ? "FREE" : label) << "\n";
+        outFile << (blockEnd - blockSize) << " \n\n";
+    }
+
+    outFile << "---start--- = 0 \n";
+
+    outFile.close();
 }
+
 size_t FlatMemoryAllocator::getAllocatedSize() const {
     return allocatedSize;
 }
