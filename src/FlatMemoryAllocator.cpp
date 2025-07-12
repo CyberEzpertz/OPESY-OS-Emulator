@@ -20,7 +20,7 @@ FlatMemoryAllocator& FlatMemoryAllocator::getInstance() {
 }
 
 void* FlatMemoryAllocator::allocate(const size_t size, std::shared_ptr<Process> process) {
-    std::lock_guard lock(memoryMutex);
+    std::unique_lock lock(memoryMutex);
 
     // Loop through memory from index 0 to (maximumSize - size)
     for (size_t i = 0; i <= maximumSize - size; ++i) {
@@ -40,6 +40,7 @@ void* FlatMemoryAllocator::allocate(const size_t size, std::shared_ptr<Process> 
 }
 
 void FlatMemoryAllocator::deallocate(void* ptr, const std::shared_ptr<Process> process) {
+    std::unique_lock lock(memoryMutex);
     const auto memIdx = static_cast<char*>(ptr) - &memoryView[0];
 
     // Double check if it's inside the memoryMap itself
@@ -50,13 +51,16 @@ void FlatMemoryAllocator::deallocate(void* ptr, const std::shared_ptr<Process> p
 }
 
 size_t FlatMemoryAllocator::getProcessMemoryUsage(const std::string& processName) const {
+    std::shared_lock lock(memoryMutex);
     return std::count(memoryMap.begin(), memoryMap.end(), processName);
 }
 size_t FlatMemoryAllocator::getTotalMemoryUsage() const {
+    std::shared_lock lock(memoryMutex);
     return allocatedSize;
 }
+
 void FlatMemoryAllocator::visualizeMemory(int quantumCycle) {
-    std::lock_guard lock(memoryMutex);
+    std::shared_lock lock(memoryMutex);
 
     // Build filename
     std::string filename = std::format("logs/memory_stamp_{}.txt", quantumCycle);
@@ -102,8 +106,7 @@ void FlatMemoryAllocator::visualizeMemory(int quantumCycle) {
         size_t blockSize = 0;
         while (index > 0) {
             --index;
-            if ((memoryMap[index].empty() && !isFree) ||
-                (!memoryMap[index].empty() && (memoryMap[index] != label))) {
+            if ((memoryMap[index].empty() && !isFree) || (!memoryMap[index].empty() && (memoryMap[index] != label))) {
                 ++index;  // step back to the last correct index
                 break;
             }
@@ -120,10 +123,8 @@ void FlatMemoryAllocator::visualizeMemory(int quantumCycle) {
     outFile.close();
 }
 
-size_t FlatMemoryAllocator::getAllocatedSize() const {
-    return allocatedSize;
-}
-size_t FlatMemoryAllocator::getMaximumSize() const {
+size_t FlatMemoryAllocator::getMaximumMemory() const {
+    std::shared_lock lock(memoryMutex);
     return maximumSize;
 }
 
