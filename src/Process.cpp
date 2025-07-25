@@ -213,6 +213,20 @@ void* Process::getBaseAddress() const {
     return baseAddress;
 }
 
+Page Process::getPageEntry(const int pageNumber) const {
+    return pageTable[pageNumber];
+}
+
+void Process::swapPageOut(const int pageNumber) {
+    pageTable[pageNumber].isValid = false;
+    pageTable[pageNumber].inBackingStore = true;
+}
+
+void Process::swapPageIn(const int pageNumber) {
+    pageTable[pageNumber].isValid = true;
+    pageTable[pageNumber].inBackingStore = false;
+}
+
 /**
  * @brief Writes all existing log entries to a file under the ./logs directory.
  *

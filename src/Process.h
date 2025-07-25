@@ -15,6 +15,12 @@
 
 enum ProcessStatus { READY, RUNNING, WAITING, DONE };
 
+struct Page {
+    int frameNumber = -1;
+    bool isValid;
+    bool inBackingStore;
+};
+
 /**
  * @class Process
  * @brief Represents a simulated process with logging and line-tracking
@@ -106,6 +112,10 @@ public:
     uint64_t getRequiredMemory() const;
     void setBaseAddress(void* ptr);
     void* getBaseAddress() const;
+    Page getPageEntry(int pageNumber) const;
+
+    void swapPageOut(int pageNumber);
+    void swapPageIn(int pageNumber);
 
 private:
     int processID;                  ///< Unique identifier for the process.
@@ -126,6 +136,8 @@ private:
     uint64_t lastInstructionCycle = 0;
     std::mutex scopeMutex;
     std::mutex instructionsMutex;
+
+    std::vector<Page> pageTable;
 
     /**
      * @brief Generates a formatted timestamp for the process creation time.
