@@ -2,6 +2,7 @@
 
 #include <deque>
 #include <memory>
+#include <shared_mutex>
 #include <string>
 #include <vector>
 
@@ -9,7 +10,7 @@
 
 class Process;
 
-class PagingAllocator : IMemoryAllocator {
+class PagingAllocator {
 public:
     static PagingAllocator& getInstance();
 
@@ -18,37 +19,28 @@ public:
     PagingAllocator(PagingAllocator&&) = delete;
     PagingAllocator& operator=(PagingAllocator&&) = delete;
 
-    // Initializes memory frame table
-    void initialize();
-
-    // Allocates virtual pages for a process (no physical frame yet)
-    void allocatePages(std::shared_ptr<Process> process);
-
     // Handles a page fault by allocating a physical frame to the given virtual address
-    void handlePageFault(std::shared_ptr<Process> process, uint16_t virtualAddress);
+    void handlePageFault(const std::shared_ptr<Process>& process, int pageNumber);
 
     // Frees all memory (physical and virtual) associated with a process
-    void deallocate(void* ptr, std::shared_ptr<Process> process) override;
-
-    void* allocate(size_t size, std::shared_ptr<Process> process) override;
-
-    // Gets total physical memory usage in bytes
-    [[nodiscard]] size_t getTotalMemoryUsage() const override;
-
-    // Gets how many frames are used by a process
-    [[nodiscard]] size_t getProcessMemoryUsage(const std::string& processName) const override;
+    void deallocate(std::shared_ptr<Process> process);
 
     // Visualize memory as frame map with process and page info
-    void visualizeMemory(int quantumCycle) override;
+    void visualizeMemory(int quantumCycle);
+
+    int getUsedMemory() const;
+    int getFreeMemory() const;
 
 private:
     PagingAllocator();
 
     int allocateFrame(int pid, int pageNumber);
+    int evictVictimFrame();
+    int getVictimFrame();
     void freeFrame(int frameIndex);
 
     void swapOut(int frameIndex);
-    void swapIn(std::shared_ptr<Process> process, int pageNumber);
+    void swapIn(std::shared_ptr<Process> process, int pageNumber) const;
 
     // Frame table metadata
     struct FrameInfo {
@@ -57,8 +49,14 @@ private:
     };
 
     size_t totalFrames;
-    size_t frameSize;
+    size_t allocatedFrames = 0;
 
     std::vector<FrameInfo> frameTable;
     std::deque<int> freeFrameIndices;
+    std::deque<int> oldFramesQueue;
+
+    std::atomic<int> numPagedIn = 0;
+    std::atomic<int> numPagedOut = 0;
+
+    mutable std::mutex pagingMutex;
 };
