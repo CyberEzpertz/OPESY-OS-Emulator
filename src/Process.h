@@ -131,7 +131,7 @@ private:
     std::atomic<ProcessStatus> status;
     std::atomic<int> currentCore;
     std::vector<std::shared_ptr<Instruction>> instructions;
-    std::vector<std::unordered_map<std::string, uint16_t>> variableStack;
+    std::unordered_map<std::string, uint16_t> variables;
     uint64_t wakeupTick;
     uint64_t lastInstructionCycle = 0;
     std::mutex scopeMutex;

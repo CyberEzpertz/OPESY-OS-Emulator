@@ -15,6 +15,8 @@
 
 #include "Config.h"
 
+constexpr int MAX_VARIABLES = 32;
+
 // Common constructor with all parameters
 Process::Process(const int id, const std::string& name, const uint64_t requiredMemory)
     : processID(id),
@@ -24,12 +26,15 @@ Process::Process(const int id, const std::string& name, const uint64_t requiredM
       currentInstructionIndex(0),
       status(READY),
       currentCore(-1),
-      variableStack({{}}),
+      variables({}),
       wakeupTick(0) {
     totalLines = 0;
     for (const auto& instr : instructions) {
         totalLines += instr->getLineCount();
     }
+
+    const int numPages = requiredMemory / Config::getInstance().getMemPerFrame();
+    pageTable.resize(numPages);
 
     timestamp = generateTimestamp();
 }
@@ -140,28 +145,25 @@ void Process::setInstructions(const std::vector<std::shared_ptr<Instruction>>& i
 bool Process::setVariable(const std::string& name, const uint16_t value) {
     std::lock_guard lock(scopeMutex);
 
-    for (auto it = variableStack.rbegin(); it != variableStack.rend(); ++it) {
-        if (it->contains(name)) {
-            (*it)[name] = value;
-            return true;
-        }
+    if (variables.contains(name)) {
+        variables[name] = value;
+        return true;
     }
+
     return false;  // Not found in any scope
 }
 
 uint16_t Process::getVariable(const std::string& name) {
     std::lock_guard lock(scopeMutex);
 
-    for (auto it = variableStack.rbegin(); it != variableStack.rend(); ++it) {
-        if (it->contains(name)) {
-            return it->at(name);
-        }
+    if (variables.contains(name)) {
+        return variables[name];
     }
 
-    if (!variableStack.empty()) {
-        variableStack.back()[name] = 0;
-        return 0;
+    if (variables.size() < MAX_VARIABLES) {
+        variables[name] = 0;
     }
+
     return 0;
 }
 
@@ -176,31 +178,20 @@ void Process::setWakeupTick(const uint64_t value) {
     this->wakeupTick = value;
 }
 
-void Process::enterScope() {
-    std::lock_guard lock(scopeMutex);
-    variableStack.emplace_back();
-}
-
-void Process::exitScope() {
-    std::lock_guard lock(scopeMutex);
-
-    if (!variableStack.empty()) {
-        variableStack.pop_back();
-    } else {
-        std::cout << ("Error: Tried to exit scope but scope stack is empty.") << std::endl;
-    }
-}
-
 bool Process::declareVariable(const std::string& name, uint16_t value) {
     std::lock_guard lock(scopeMutex);
 
-    if (variableStack.empty())
-        return false;
-    auto& currentScope = variableStack.back();
-    if (currentScope.contains(name)) {
-        return false;  // Already declared in this scope
+    // If we're pass max variables, just ignore according to project specs
+    if (variables.size() >= MAX_VARIABLES) {
+        return true;
     }
-    currentScope[name] = value;
+
+    // Don't allow double declarations of the same variable
+    if (variables.contains(name)) {
+        return false;
+    }
+
+    variables[name] = value;
     return true;
 }
 uint64_t Process::getRequiredMemory() const {
