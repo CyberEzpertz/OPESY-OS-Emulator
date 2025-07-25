@@ -15,7 +15,7 @@
 
 enum ProcessStatus { READY, RUNNING, WAITING, DONE };
 
-struct Page {
+struct PageEntry {
     int frameNumber = -1;
     bool isValid;
     bool inBackingStore;
@@ -112,10 +112,10 @@ public:
     uint64_t getRequiredMemory() const;
     void setBaseAddress(void* ptr);
     void* getBaseAddress() const;
-    Page getPageEntry(int pageNumber) const;
+    PageEntry getPageEntry(int pageNumber) const;
 
     void swapPageOut(int pageNumber);
-    void swapPageIn(int pageNumber);
+    void swapPageIn(int pageNumber, int frameNumber);
 
 private:
     int processID;                  ///< Unique identifier for the process.
@@ -137,7 +137,7 @@ private:
     std::mutex scopeMutex;
     std::mutex instructionsMutex;
 
-    std::vector<Page> pageTable;
+    std::vector<PageEntry> pageTable;
 
     /**
      * @brief Generates a formatted timestamp for the process creation time.

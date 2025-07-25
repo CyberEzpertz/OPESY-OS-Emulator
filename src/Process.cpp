@@ -213,18 +213,20 @@ void* Process::getBaseAddress() const {
     return baseAddress;
 }
 
-Page Process::getPageEntry(const int pageNumber) const {
+PageEntry Process::getPageEntry(const int pageNumber) const {
     return pageTable[pageNumber];
 }
 
 void Process::swapPageOut(const int pageNumber) {
     pageTable[pageNumber].isValid = false;
     pageTable[pageNumber].inBackingStore = true;
+    pageTable[pageNumber].frameNumber = -1;
 }
 
-void Process::swapPageIn(const int pageNumber) {
+void Process::swapPageIn(const int pageNumber, const int frameNumber) {
     pageTable[pageNumber].isValid = true;
     pageTable[pageNumber].inBackingStore = false;
+    pageTable[pageNumber].frameNumber = frameNumber;
 }
 
 /**
