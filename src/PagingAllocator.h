@@ -1,9 +1,9 @@
 #pragma once
 
+#include <atomic>
 #include <deque>
 #include <memory>
 #include <shared_mutex>
-#include <string>
 #include <vector>
 
 class Process;
