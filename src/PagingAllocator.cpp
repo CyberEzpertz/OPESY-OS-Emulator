@@ -17,18 +17,19 @@ PagingAllocator& PagingAllocator::getInstance() {
 
 static constexpr const char* BACKING_STORE_FILE = "csopesy-backing-store.txt";
 
-void PagingAllocator::handlePageFault(const std::shared_ptr<Process>& process, const int pageNumber) {
+void PagingAllocator::handlePageFault(const int pid, const int pageNumber) {
+    const auto process = ConsoleManager::getInstance().getProcessByPID(pid);
+
     std::lock_guard lock(pagingMutex);
 
     const PageEntry entry = process->getPageEntry(pageNumber);
-    const int processId = process->getID();
 
     // If the entry was swapped out, this will trigger
     if (entry.inBackingStore) {
-        swapIn(process, pageNumber);
+        swapIn(pid, pageNumber);
     }
 
-    int frameIndex = allocateFrame(processId, pageNumber);
+    int frameIndex = allocateFrame(pid, pageNumber);
 
     // If the allocation was unsuccessful, evict a frame then allocate it again
     if (frameIndex == -1) {
@@ -36,7 +37,7 @@ void PagingAllocator::handlePageFault(const std::shared_ptr<Process>& process, c
         evictVictimFrame();
 
         // This should now succeed since we evicted a frame
-        frameIndex = allocateFrame(processId, pageNumber);
+        frameIndex = allocateFrame(pid, pageNumber);
 
         if (frameIndex == -1) {
             throw std::runtime_error("Frame eviction succeeded, but no frame was available for reallocation — possible "
@@ -48,9 +49,8 @@ void PagingAllocator::handlePageFault(const std::shared_ptr<Process>& process, c
     this->numPagedIn += 1;
 }
 
-void PagingAllocator::deallocate(std::shared_ptr<Process> process) {
+void PagingAllocator::deallocate(const int pid) {
     std::lock_guard lock(pagingMutex);
-    const int pid = process->getID();
 
     // 1. Free all physical frames used by the process
     for (size_t i = 0; i < frameTable.size(); ++i) {
@@ -191,7 +191,7 @@ void PagingAllocator::swapOut(const int frameIndex) {
     freeFrame(frameIndex);
 }
 
-void PagingAllocator::swapIn(std::shared_ptr<Process> process, int pageNumber) const {
+void PagingAllocator::swapIn(const int pid, int pageNumber) const {
     // Read the previous contents
     std::ifstream backingFile(BACKING_STORE_FILE);
 
@@ -201,12 +201,12 @@ void PagingAllocator::swapIn(std::shared_ptr<Process> process, int pageNumber) c
     std::string line;
     while (std::getline(backingFile, line)) {
         std::istringstream iss(line);
-        int pid, page;
-        if (!(iss >> pid >> page))
+        int readPID, page;
+        if (!(iss >> readPID >> page))
             throw std::runtime_error("Backing store file is malformed, please check it.");
 
         // Skip the page to be loaded back in
-        if (pid == process->getID() && page == pageNumber) {
+        if (readPID == pid && page == pageNumber) {
             continue;
         }
 

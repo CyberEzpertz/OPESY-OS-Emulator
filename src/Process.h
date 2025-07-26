@@ -5,6 +5,7 @@
 #pragma once
 
 #include <atomic>
+#include <set>
 #include <shared_mutex>
 #include <string>
 #include <unordered_map>
@@ -106,8 +107,6 @@ public:
         return lastInstructionCycle;
     }
 
-    void enterScope();
-    void exitScope();
     bool declareVariable(const std::string& name, uint16_t value);
     uint64_t getRequiredMemory() const;
     void setBaseAddress(void* ptr);
@@ -116,6 +115,9 @@ public:
 
     void swapPageOut(int pageNumber);
     void swapPageIn(int pageNumber, int frameNumber);
+
+    void writeToHeap(int address, uint16_t value);
+    uint16_t readFromHeap(int address);
 
 private:
     int processID;                  ///< Unique identifier for the process.
@@ -138,6 +140,15 @@ private:
     std::mutex instructionsMutex;
 
     std::vector<PageEntry> pageTable;
+    std::set<int> symbolTablePages;
+
+    std::vector<uint16_t> heapMemory;
+    size_t maxHeapMemory;
+    int heapStartPage;
+    int heapStartOffset;
+
+    bool didShutdown;
+    std::string shutdownDetails;
 
     /**
      * @brief Generates a formatted timestamp for the process creation time.

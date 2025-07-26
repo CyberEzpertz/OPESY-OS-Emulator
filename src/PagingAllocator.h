@@ -20,10 +20,10 @@ public:
     PagingAllocator& operator=(PagingAllocator&&) = delete;
 
     // Handles a page fault by allocating a physical frame to the given virtual address
-    void handlePageFault(const std::shared_ptr<Process>& process, int pageNumber);
+    void handlePageFault(int pid, int pageNumber);
 
     // Frees all memory (physical and virtual) associated with a process
-    void deallocate(std::shared_ptr<Process> process);
+    void deallocate(int pid);
 
     // Visualize memory as frame map with process and page info
     void visualizeMemory(int quantumCycle);
@@ -40,7 +40,7 @@ private:
     void freeFrame(int frameIndex);
 
     void swapOut(int frameIndex);
-    void swapIn(std::shared_ptr<Process> process, int pageNumber) const;
+    void swapIn(int pid, int pageNumber) const;
 
     // Frame table metadata
     struct FrameInfo {
