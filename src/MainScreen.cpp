@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "ConsoleManager.h"
+#include "PagingAllocator.h"
 #include "ProcessScheduler.h"
 
 /// @brief Returns the singleton instance of MainScreen.
@@ -141,6 +142,8 @@ void MainScreen::handleUserInput() {
         scheduler.printQueues();
     } else if (cmd == "report-util") {
         generateUtilizationReport();
+    } else if (cmd == "visualize") {
+        PagingAllocator::getInstance().visualizeMemory();
     } else {
         std::println("Error: Unknown command {}", cmd);
     }

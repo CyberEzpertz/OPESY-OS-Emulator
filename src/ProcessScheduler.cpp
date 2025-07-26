@@ -6,6 +6,7 @@
 
 #include "ConsoleManager.h"
 #include "FlatMemoryAllocator.h"  // Add this include
+#include "PagingAllocator.h"
 #include "Process.h"
 
 using namespace std::chrono_literals;
@@ -58,7 +59,6 @@ void ProcessScheduler::stop() {
     running = false;
     generatingDummies = false;
     tickCv.notify_all();
-    readyCv.notify_all();
 }
 
 int ProcessScheduler::getNumAvailableCores() const {
@@ -79,13 +79,6 @@ void ProcessScheduler::scheduleProcess(const std::shared_ptr<Process>& process) 
         std::lock_guard lock(readyMutex);
         readyQueue.push_back(process);
     }
-
-    // Wake one worker in case they were waiting for work
-    readyCv.notify_one();
-}
-
-void ProcessScheduler::sortQueue() {
-    // TODO: Implement this when needed
 }
 
 void ProcessScheduler::sleepProcess(const std::shared_ptr<Process>& process) {
@@ -96,22 +89,22 @@ void ProcessScheduler::sleepProcess(const std::shared_ptr<Process>& process) {
 }
 
 uint64_t ProcessScheduler::getCurrentCycle() const {
-    return cpuCycles;
+    return totalCPUTicks;
 }
 
-void ProcessScheduler::incrementCpuCycles() {
+void ProcessScheduler::incrementCpuTicks() {
     {
-        std::lock_guard lock(tickMutex);
-        ++cpuCycles;
+        std::unique_lock lock(tickMutex);
+
+        // Only tick when all cores are finished executing an instruction
+        tickCv.wait(lock, [&] { return coresFinishedThisTick >= numCpuCores || totalCPUTicks == 0; });
     }
 
     // Wakeup all sleeping processes that need to wakeup
-    // NOTE: This should be put before tickCv, otherwise the cores might not be
-    // able to get the recently woken up processes
     {
         std::lock_guard lock(waitMutex);
 
-        while (!waitQueue.empty() && waitQueue.top()->getWakeupTick() <= cpuCycles) {
+        while (!waitQueue.empty() && waitQueue.top()->getWakeupTick() <= (totalCPUTicks + 1)) {
             auto proc = waitQueue.top();
             waitQueue.pop();
 
@@ -129,6 +122,8 @@ void ProcessScheduler::incrementCpuCycles() {
         }
     }
 
+    ++totalCPUTicks;
+    coresFinishedThisTick = 0;
     tickCv.notify_all();  // Notify all worker threads that a new tick occurred
 }
 
@@ -169,8 +164,6 @@ void ProcessScheduler::dummyGeneratorLoop() {
 
         if (!generatingDummies)
             break;
-        if ((getCurrentCycle() - lastCycle) < interval)
-            continue;
 
         lastCycle = getCurrentCycle();  // time for a new batch!
 
@@ -191,15 +184,9 @@ void ProcessScheduler::printQueues() const {
 }
 
 void ProcessScheduler::tickLoop() {
-    const auto quantumTicks = Config::getInstance().getQuantumCycles();  // quantum as number of ticks
     while (running) {
         std::this_thread::sleep_for(1ms);  // Simulate one tick every 1ms
-        incrementCpuCycles();
-        const int currentQuantumCycle = getCurrentCycle() / quantumTicks;
-
-        if (quantumTicks > 0 && getCurrentCycle() % quantumTicks == 0) {
-            FlatMemoryAllocator::getInstance().visualizeMemory(currentQuantumCycle);
-        }
+        incrementCpuTicks();
     }
 }
 
@@ -210,15 +197,22 @@ void ProcessScheduler::executeFCFS(const std::shared_ptr<Process>& proc, uint64_
         // Wait for next tick before executing next instruction
         {
             std::unique_lock lock(tickMutex);
-            tickCv.wait(lock, [&] { return cpuCycles > lastTickSeen || !running; });
+            tickCv.wait(lock, [&] { return totalCPUTicks > lastTickSeen || !running; });
 
             if (!running)
                 break;
-            lastTickSeen = cpuCycles;
+            lastTickSeen = totalCPUTicks;
         }
 
-        if (delayCycles == 0 || cpuCycles % delayCycles == 0) {
+        if (delayCycles == 0 || totalCPUTicks % delayCycles == 0) {
             proc->incrementLine();
+        }
+
+        ++activeCpuTicks;
+        ++coresFinishedThisTick;
+
+        if (coresFinishedThisTick >= numCpuCores) {
+            tickCv.notify_all();  // only notify when all cores are done
         }
     }
 }
@@ -228,20 +222,28 @@ void ProcessScheduler::executeRR(const std::shared_ptr<Process>& proc, uint64_t&
     uint32_t cyclesExecuted = 0;
     const uint32_t delayCycles = Config::getInstance().getDelaysPerExec();
     const auto quantumCycles = Config::getInstance().getQuantumCycles();
+
     while (proc && proc->getStatus() == RUNNING && cyclesExecuted < quantumCycles) {
         // Wait for next tick before executing next instruction
         {
             std::unique_lock lock(tickMutex);
-            tickCv.wait(lock, [&] { return cpuCycles > lastTickSeen || !running; });
+            tickCv.wait(lock, [&] { return totalCPUTicks > lastTickSeen || !running; });
 
             if (!running)
                 break;
-            lastTickSeen = cpuCycles;
+            lastTickSeen = totalCPUTicks;
         }
 
-        if (delayCycles == 0 || cpuCycles % delayCycles == 0) {
+        if (delayCycles == 0 || totalCPUTicks % delayCycles == 0) {
             proc->incrementLine();
             cyclesExecuted++;
+        }
+
+        ++activeCpuTicks;
+        ++coresFinishedThisTick;
+
+        if (coresFinishedThisTick >= numCpuCores) {
+            tickCv.notify_all();  // only notify when all cores are done
         }
     }
 
@@ -249,11 +251,75 @@ void ProcessScheduler::executeRR(const std::shared_ptr<Process>& proc, uint64_t&
     if (proc && proc->getStatus() == RUNNING && cyclesExecuted >= quantumCycles) {
         proc->setStatus(READY);
         scheduleProcess(proc);  // Put back at end of ready queue
-        // Note: Memory remains allocated during preemption
     }
 }
 
-// New method to attempt memory allocation for a process
+void ProcessScheduler::resetCore(std::shared_ptr<Process>& proc) {
+    // Check if process is finished
+    if (proc->getIsFinished()) {
+        proc->setStatus(DONE);
+        // Deallocate memory for completed process
+        PagingAllocator::getInstance().deallocate(proc->getID());
+    }
+
+    // Reset current core to none
+    proc->setCurrentCore(-1);
+    proc = nullptr;
+    availableCores += 1;
+}
+
+void ProcessScheduler::workerLoop(const int coreId) {
+    uint64_t lastTickSeen = 0;
+    std::shared_ptr<Process> proc = nullptr;
+    const auto schedulerType = Config::getInstance().getSchedulerType();
+
+    while (running) {
+        lastTickSeen = totalCPUTicks;
+
+        // Wait for tick to be updated
+        {
+            std::unique_lock lock(tickMutex);
+            tickCv.wait(lock, [&] { return totalCPUTicks > lastTickSeen || !running; });
+
+            if (!running)
+                break;
+        }
+
+        // Get a process from the queue
+        {
+            std::lock_guard lock(readyMutex);
+
+            if (!readyQueue.empty()) {
+                proc = readyQueue.front();
+                readyQueue.pop_front();
+
+                proc->setStatus(RUNNING);
+                proc->setCurrentCore(coreId);
+                availableCores -= 1;
+            }
+        }
+
+        // Idle if core wasn't able to find a process
+        if (!proc) {
+            idleCpuTicks += 1;
+            coresFinishedThisTick += 1;
+            tickCv.notify_all();
+
+            continue;
+        }
+
+        // Execute process based on scheduler type
+        if (schedulerType == SchedulerType::FCFS) {
+            executeFCFS(proc, lastTickSeen);
+        } else {
+            executeRR(proc, lastTickSeen);
+        }
+
+        resetCore(proc);
+    }
+}
+
+// DEPRECATED: This is for Flat Memory Allocator only
 bool ProcessScheduler::tryAllocateMemory(std::shared_ptr<Process>& proc) {
     // Check if process already has memory allocated
     if (proc->getBaseAddress() != nullptr) {
@@ -277,73 +343,12 @@ bool ProcessScheduler::tryAllocateMemory(std::shared_ptr<Process>& proc) {
     return allocatedMemory != nullptr;
 }
 
-// New method to deallocate memory for a process
+// DEPRECATED: This is for Flat Memory Allocator only
 void ProcessScheduler::deallocateProcessMemory(const std::shared_ptr<Process>& proc) const {
     if (proc->getBaseAddress() != nullptr) {
         FlatMemoryAllocator::getInstance().deallocate(proc->getBaseAddress(), proc);
 
         // For debugging
         // std::println("Process {} deallocated memory at address {}", proc->getName(), proc->getBaseAddress());
-    }
-}
-
-void ProcessScheduler::workerLoop(const int coreId) {
-    uint64_t lastTickSeen = 0;
-    std::shared_ptr<Process> proc = nullptr;
-    const auto schedulerType = Config::getInstance().getSchedulerType();
-
-    while (running) {
-        // Get a process from the queue
-        {
-            std::unique_lock lock(readyMutex);
-
-            readyCv.wait(lock, [&] { return !readyQueue.empty() || !running; });
-
-            if (!running)
-                break;
-
-            if (!readyQueue.empty()) {
-                proc = readyQueue.front();
-                readyQueue.pop_front();
-
-                // CRITICAL: Attempt memory allocation before running the process
-                if (tryAllocateMemory(proc)) {
-                    // Memory allocation successful - proceed with execution
-                    proc->setStatus(RUNNING);
-                    proc->setCurrentCore(coreId);
-                    availableCores -= 1;
-                } else {
-                    // Memory allocation failed - move process to back of ready queue
-                    readyQueue.push_back(proc);
-                    proc = nullptr;  // Don't execute this process
-                    continue;        // Try next process in queue
-                }
-            }
-        }
-
-        if (!proc)
-            continue;
-
-        // Execute process based on scheduler type
-        if (schedulerType == SchedulerType::FCFS) {
-            executeFCFS(proc, lastTickSeen);
-        } else if (schedulerType == SchedulerType::RR) {
-            executeRR(proc, lastTickSeen);
-        }
-
-        // Handle process completion or cleanup
-        if (proc) {
-            // Check if process is finished
-            if (proc->getIsFinished()) {
-                proc->setStatus(DONE);
-                // Deallocate memory for completed process
-                deallocateProcessMemory(proc);
-            }
-
-            // Reset current core to none
-            proc->setCurrentCore(-1);
-            proc = nullptr;
-            availableCores += 1;
-        }
     }
 }

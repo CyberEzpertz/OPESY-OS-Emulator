@@ -5,6 +5,7 @@
 #pragma once
 
 #include <atomic>
+#include <set>
 #include <shared_mutex>
 #include <string>
 #include <unordered_map>
@@ -14,6 +15,12 @@
 #include "PrintInstruction.h"
 
 enum ProcessStatus { READY, RUNNING, WAITING, DONE };
+
+struct PageEntry {
+    int frameNumber = -1;
+    bool isValid;
+    bool inBackingStore;
+};
 
 /**
  * @class Process
@@ -100,12 +107,17 @@ public:
         return lastInstructionCycle;
     }
 
-    void enterScope();
-    void exitScope();
     bool declareVariable(const std::string& name, uint16_t value);
     uint64_t getRequiredMemory() const;
     void setBaseAddress(void* ptr);
     void* getBaseAddress() const;
+    PageEntry getPageEntry(int pageNumber) const;
+
+    void swapPageOut(int pageNumber);
+    void swapPageIn(int pageNumber, int frameNumber);
+
+    void writeToHeap(int address, uint16_t value);
+    uint16_t readFromHeap(int address);
 
 private:
     int processID;                  ///< Unique identifier for the process.
@@ -121,11 +133,22 @@ private:
     std::atomic<ProcessStatus> status;
     std::atomic<int> currentCore;
     std::vector<std::shared_ptr<Instruction>> instructions;
-    std::vector<std::unordered_map<std::string, uint16_t>> variableStack;
+    std::unordered_map<std::string, uint16_t> variables;
     uint64_t wakeupTick;
     uint64_t lastInstructionCycle = 0;
     std::mutex scopeMutex;
     std::mutex instructionsMutex;
+
+    std::vector<PageEntry> pageTable;
+    std::set<int> symbolTablePages;
+
+    std::vector<uint16_t> heapMemory;
+    size_t maxHeapMemory;
+    int heapStartPage = 0;
+    int heapStartOffset = 0;
+
+    bool didShutdown = false;
+    std::string shutdownDetails;
 
     /**
      * @brief Generates a formatted timestamp for the process creation time.

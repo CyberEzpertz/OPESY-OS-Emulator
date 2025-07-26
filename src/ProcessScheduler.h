@@ -29,7 +29,6 @@ public:
     int getNumTotalCores() const;
     void initialize();
     void scheduleProcess(const std::shared_ptr<Process>& process);
-    void sortQueue();
     void sleepProcess(const std::shared_ptr<Process>& process);
     uint64_t getCurrentCycle() const;
     void printQueues() const;
@@ -46,7 +45,7 @@ private:
 
     void tickLoop();
     void workerLoop(int coreId);
-    void incrementCpuCycles();
+    void incrementCpuTicks();
     void dummyGeneratorLoop();
     void executeFCFS(const std::shared_ptr<Process>& proc, uint64_t& lastTickSeen);
     void executeRR(const std::shared_ptr<Process>& proc, uint64_t& lastTickSeen);
@@ -54,12 +53,12 @@ private:
     // Memory management methods
     bool tryAllocateMemory(std::shared_ptr<Process>& proc);
     void deallocateProcessMemory(const std::shared_ptr<Process>& proc) const;
+    void resetCore(std::shared_ptr<Process>& proc);
 
     int numCpuCores;
     std::atomic<int> availableCores;
 
     std::deque<std::shared_ptr<Process>> readyQueue;
-    std::condition_variable readyCv;
     std::mutex readyMutex;
 
     std::priority_queue<std::shared_ptr<Process>, std::vector<std::shared_ptr<Process>>, WakeupComparator> waitQueue;
@@ -67,9 +66,12 @@ private:
 
     std::condition_variable tickCv;
     std::mutex tickMutex;
+    std::atomic<int> coresFinishedThisTick = 0;
 
     std::vector<std::thread> cpuWorkers;
-    std::atomic<uint64_t> cpuCycles{0};
+    std::atomic<uint64_t> totalCPUTicks{0};
+    std::atomic<uint64_t> activeCpuTicks = 0;
+    std::atomic<uint64_t> idleCpuTicks = 0;
     std::atomic<bool> running{false};
 
     std::thread dummyGeneratorThread;

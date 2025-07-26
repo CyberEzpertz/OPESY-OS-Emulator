@@ -10,10 +10,18 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <set>
 #include <shared_mutex>
 #include <sstream>
 
 #include "Config.h"
+#include "PagingAllocator.h"
+
+// If INSTRUCTION_SIZE is 0, we assume it doesn't count toward paging
+constexpr int INSTRUCTION_SIZE = 0;
+
+constexpr int MAX_VARIABLES = 32;
+constexpr int VARIABLE_SIZE = 2;
 
 // Common constructor with all parameters
 Process::Process(const int id, const std::string& name, const uint64_t requiredMemory)
@@ -24,8 +32,9 @@ Process::Process(const int id, const std::string& name, const uint64_t requiredM
       currentInstructionIndex(0),
       status(READY),
       currentCore(-1),
-      variableStack({{}}),
-      wakeupTick(0) {
+      variables({}),
+      wakeupTick(0),
+      maxHeapMemory(0) {
     totalLines = 0;
     for (const auto& instr : instructions) {
         totalLines += instr->getLineCount();
@@ -101,7 +110,15 @@ void Process::log(const std::string& entry) {
 void Process::incrementLine() {
     std::lock_guard lock(instructionsMutex);
     if (currentLine < totalLines) {
+        // [IMPORTANT] This commented code is if instructions are used in paging, uncomment if needed
+        // const int instructionPage = (currentLine * INSTRUCTION_SIZE) / Config::getInstance().getMemPerFrame();
+        //
+        // if (!pageTable[instructionPage].isValid) {
+        //     PagingAllocator::getInstance().handlePageFault(this->processID, instructionPage);
+        // }
+
         instructions[currentInstructionIndex]->execute();
+
         currentLine++;
 
         if (instructions[currentInstructionIndex]->isComplete())
@@ -136,32 +153,66 @@ void Process::setInstructions(const std::vector<std::shared_ptr<Instruction>>& i
     for (const auto& instr : instructions) {
         this->totalLines += instr->getLineCount();
     }
+
+    const int pageSize = static_cast<int>(Config::getInstance().getMemPerFrame());
+
+    const size_t numPages = requiredMemory / pageSize;
+    pageTable.resize(numPages);
+
+    // Calculate where the heap begins
+
+    const int symbolTableStartByte = totalLines * INSTRUCTION_SIZE;
+    const int symbolTableEndByte = symbolTableStartByte + MAX_VARIABLES * 2;
+
+    const int symbolStartPage = symbolTableStartByte / pageSize;
+    const int symbolEndPage = (symbolTableEndByte - 1) / pageSize;  // inclusive
+
+    // Populate symbolTablePages set
+    for (int page = symbolStartPage; page <= symbolEndPage; ++page) {
+        symbolTablePages.insert(page);
+    }
+
+    heapStartPage = symbolTableEndByte / pageSize;
+    heapStartOffset = symbolTableEndByte % pageSize;
+
+    const int heapBytes = numPages * pageSize - (heapStartPage * pageSize + heapStartOffset);
+    heapMemory.resize(heapBytes);
 }
+
 bool Process::setVariable(const std::string& name, const uint16_t value) {
     std::lock_guard lock(scopeMutex);
 
-    for (auto it = variableStack.rbegin(); it != variableStack.rend(); ++it) {
-        if (it->contains(name)) {
-            (*it)[name] = value;
-            return true;
+    for (const int page : symbolTablePages) {
+        if (!pageTable[page].isValid) {
+            PagingAllocator::getInstance().handlePageFault(processID, page);
         }
     }
-    return false;  // Not found in any scope
+
+    if (variables.contains(name)) {
+        variables[name] = value;
+        return true;
+    }
+
+    return false;
 }
 
 uint16_t Process::getVariable(const std::string& name) {
     std::lock_guard lock(scopeMutex);
 
-    for (auto it = variableStack.rbegin(); it != variableStack.rend(); ++it) {
-        if (it->contains(name)) {
-            return it->at(name);
+    for (const int page : symbolTablePages) {
+        if (!pageTable[page].isValid) {
+            PagingAllocator::getInstance().handlePageFault(processID, page);
         }
     }
 
-    if (!variableStack.empty()) {
-        variableStack.back()[name] = 0;
-        return 0;
+    if (variables.contains(name)) {
+        return variables[name];
     }
+
+    if (variables.size() < MAX_VARIABLES) {
+        variables[name] = 0;
+    }
+
     return 0;
 }
 
@@ -176,33 +227,29 @@ void Process::setWakeupTick(const uint64_t value) {
     this->wakeupTick = value;
 }
 
-void Process::enterScope() {
-    std::lock_guard lock(scopeMutex);
-    variableStack.emplace_back();
-}
-
-void Process::exitScope() {
-    std::lock_guard lock(scopeMutex);
-
-    if (!variableStack.empty()) {
-        variableStack.pop_back();
-    } else {
-        std::cout << ("Error: Tried to exit scope but scope stack is empty.") << std::endl;
-    }
-}
-
 bool Process::declareVariable(const std::string& name, uint16_t value) {
     std::lock_guard lock(scopeMutex);
 
-    if (variableStack.empty())
-        return false;
-    auto& currentScope = variableStack.back();
-    if (currentScope.contains(name)) {
-        return false;  // Already declared in this scope
+    for (const int page : symbolTablePages) {
+        if (!pageTable[page].isValid) {
+            PagingAllocator::getInstance().handlePageFault(processID, page);
+        }
     }
-    currentScope[name] = value;
+
+    // If we're pass max variables, just ignore according to project specs
+    if (variables.size() >= MAX_VARIABLES) {
+        return true;
+    }
+
+    // Don't allow double declarations of the same variable
+    if (variables.contains(name)) {
+        return false;
+    }
+
+    variables[name] = value;
     return true;
 }
+
 uint64_t Process::getRequiredMemory() const {
     return requiredMemory;
 }
@@ -211,6 +258,66 @@ void Process::setBaseAddress(void* ptr) {
 }
 void* Process::getBaseAddress() const {
     return baseAddress;
+}
+
+PageEntry Process::getPageEntry(const int pageNumber) const {
+    return pageTable[pageNumber];
+}
+
+void Process::swapPageOut(const int pageNumber) {
+    pageTable[pageNumber].isValid = false;
+    pageTable[pageNumber].inBackingStore = true;
+    pageTable[pageNumber].frameNumber = -1;
+}
+
+void Process::swapPageIn(const int pageNumber, const int frameNumber) {
+    pageTable[pageNumber].isValid = true;
+    pageTable[pageNumber].inBackingStore = false;
+    pageTable[pageNumber].frameNumber = frameNumber;
+}
+
+void Process::writeToHeap(const int address, const uint16_t value) {
+    const auto pageSize = Config::getInstance().getMemPerFrame();
+    const int totalOffset = heapStartOffset + address;
+    const int pageNumber = heapStartPage + (totalOffset / pageSize);
+
+    if (address < 0 || address + 1 >= heapMemory.size() || address % 2 == 1) {
+        didShutdown = true;
+        shutdownDetails =
+            std::format("Process {} shut down due to memory access violation error that occurred at {}. {:x} invalid.",
+                        processName, getTimestamp(), address);
+        status = DONE;
+
+        return;
+    }
+
+    if (!pageTable[pageNumber].isValid) {
+        PagingAllocator::getInstance().handlePageFault(processID, pageNumber);
+    }
+
+    heapMemory[address] = value & 0xFF;             // lower byte
+    heapMemory[address + 1] = (value >> 8) & 0xFF;  // upper byte
+}
+
+uint16_t Process::readFromHeap(const int address) {
+    const int pageSize = Config::getInstance().getMemPerFrame();
+    const int totalOffset = heapStartOffset + address;
+    const int pageNumber = heapStartPage + (totalOffset / pageSize);
+
+    if (address < 0 || address + 1 >= heapMemory.size() || address % 2 == 1) {
+        didShutdown = true;
+        shutdownDetails =
+            std::format("Process {} shut down due to memory access violation error that occurred at {}. {:x} invalid.",
+                        processName, getTimestamp(), address);
+        status = DONE;
+    }
+
+    if (!pageTable[pageNumber].isValid) {
+        PagingAllocator::getInstance().handlePageFault(processID, pageNumber);
+    }
+
+    // Combine the two halves here
+    return heapMemory[address] | (heapMemory[address + 1] << 8);
 }
 
 /**
