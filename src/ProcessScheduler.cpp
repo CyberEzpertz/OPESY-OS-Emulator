@@ -72,6 +72,7 @@ int ProcessScheduler::getNumTotalCores() const {
 void ProcessScheduler::initialize() {
     this->numCpuCores = Config::getInstance().getNumCPUs();
     this->availableCores = Config::getInstance().getNumCPUs();
+    coreAssignments.resize(numCpuCores);  // One slot per core
 }
 
 void ProcessScheduler::scheduleProcess(const std::shared_ptr<Process>& process) {
@@ -254,7 +255,7 @@ void ProcessScheduler::executeRR(const std::shared_ptr<Process>& proc, uint64_t&
     }
 }
 
-void ProcessScheduler::resetCore(std::shared_ptr<Process>& proc) {
+void ProcessScheduler::resetCore(std::shared_ptr<Process>& proc, int coreId) {
     // Check if process is finished
     if (proc->getIsFinished()) {
         proc->setStatus(DONE);
@@ -266,6 +267,7 @@ void ProcessScheduler::resetCore(std::shared_ptr<Process>& proc) {
     proc->setCurrentCore(-1);
     proc = nullptr;
     availableCores += 1;
+    coreAssignments[coreId] = nullptr;  // Clear assignment
 }
 
 void ProcessScheduler::workerLoop(const int coreId) {
@@ -296,6 +298,8 @@ void ProcessScheduler::workerLoop(const int coreId) {
                 proc->setStatus(RUNNING);
                 proc->setCurrentCore(coreId);
                 availableCores -= 1;
+
+                coreAssignments[coreId] = proc;
             }
         }
 
@@ -315,7 +319,7 @@ void ProcessScheduler::workerLoop(const int coreId) {
             executeRR(proc, lastTickSeen);
         }
 
-        resetCore(proc);
+        resetCore(proc, coreId);
     }
 }
 

@@ -53,10 +53,11 @@ private:
     // Memory management methods
     bool tryAllocateMemory(std::shared_ptr<Process>& proc);
     void deallocateProcessMemory(const std::shared_ptr<Process>& proc) const;
-    void resetCore(std::shared_ptr<Process>& proc);
+    void resetCore(std::shared_ptr<Process>& proc, int coreId);
 
     int numCpuCores;
     std::atomic<int> availableCores;
+    std::vector<std::shared_ptr<Process>> coreAssignments;
 
     std::deque<std::shared_ptr<Process>> readyQueue;
     std::mutex readyMutex;
