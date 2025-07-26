@@ -118,6 +118,7 @@ public:
 
     void writeToHeap(int address, uint16_t value);
     uint16_t readFromHeap(int address);
+    std::uint64_t getMemoryUsage() const;
 
 private:
     int processID;                  ///< Unique identifier for the process.

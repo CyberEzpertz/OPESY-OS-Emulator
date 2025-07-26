@@ -367,3 +367,16 @@ std::string Process::generateTimestamp() const {
     oss << std::put_time(&local_tm, "%m/%d/%Y, %I:%M:%S %p");
     return oss.str();
 }
+
+std::uint64_t Process::getMemoryUsage() const {
+    std::lock_guard lock(scopeMutex);
+    uint64_t memoryUsage = 0;
+    auto pageSize = Config::getInstance().getMemPerFrame();
+
+    for (const auto page : pageTable) {
+        if (page.isValid)
+            memoryUsage += pageSize;
+    }
+
+    return memoryUsage;
+}
