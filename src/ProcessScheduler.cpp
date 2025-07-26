@@ -81,10 +81,6 @@ void ProcessScheduler::scheduleProcess(const std::shared_ptr<Process>& process) 
     }
 }
 
-void ProcessScheduler::sortQueue() {
-    // TODO: Implement this when needed
-}
-
 void ProcessScheduler::sleepProcess(const std::shared_ptr<Process>& process) {
     {
         std::lock_guard lock(waitMutex);
@@ -258,40 +254,6 @@ void ProcessScheduler::executeRR(const std::shared_ptr<Process>& proc, uint64_t&
     }
 }
 
-// DEPRECATED: This is for Flat Memory Allocator only
-bool ProcessScheduler::tryAllocateMemory(std::shared_ptr<Process>& proc) {
-    // Check if process already has memory allocated
-    if (proc->getBaseAddress() != nullptr) {
-        return true;  // Memory already allocated
-    }
-
-    // Attempt to allocate memory
-    const void* allocatedMemory = FlatMemoryAllocator::getInstance().allocate(proc->getRequiredMemory(), proc);
-
-    if (allocatedMemory == nullptr) {
-        // Memory allocation failed
-        // For debugging
-        // std::println("Process {} failed to allocate {} bytes of memory", proc->getName(), proc->getRequiredMemory());
-    } else {
-        // Memory allocation successful
-        // For debugging
-        // std::println("Process {} allocated {} bytes of memory at address {}", proc->getName(),
-        // proc->getRequiredMemory(), allocatedMemory);
-    }
-
-    return allocatedMemory != nullptr;
-}
-
-// DEPRECATED: This is for Flat Memory Allocator only
-void ProcessScheduler::deallocateProcessMemory(const std::shared_ptr<Process>& proc) const {
-    if (proc->getBaseAddress() != nullptr) {
-        FlatMemoryAllocator::getInstance().deallocate(proc->getBaseAddress(), proc);
-
-        // For debugging
-        // std::println("Process {} deallocated memory at address {}", proc->getName(), proc->getBaseAddress());
-    }
-}
-
 void ProcessScheduler::resetCore(std::shared_ptr<Process>& proc) {
     // Check if process is finished
     if (proc->getIsFinished()) {
@@ -349,15 +311,44 @@ void ProcessScheduler::workerLoop(const int coreId) {
         // Execute process based on scheduler type
         if (schedulerType == SchedulerType::FCFS) {
             executeFCFS(proc, lastTickSeen);
-            resetCore(proc);
-
-            // Continue because we already do tick loops inside the execution
-            continue;
-        }
-
-        if (schedulerType == SchedulerType::RR) {
+        } else {
             executeRR(proc, lastTickSeen);
-            resetCore(proc);
         }
+
+        resetCore(proc);
+    }
+}
+
+// DEPRECATED: This is for Flat Memory Allocator only
+bool ProcessScheduler::tryAllocateMemory(std::shared_ptr<Process>& proc) {
+    // Check if process already has memory allocated
+    if (proc->getBaseAddress() != nullptr) {
+        return true;  // Memory already allocated
+    }
+
+    // Attempt to allocate memory
+    const void* allocatedMemory = FlatMemoryAllocator::getInstance().allocate(proc->getRequiredMemory(), proc);
+
+    if (allocatedMemory == nullptr) {
+        // Memory allocation failed
+        // For debugging
+        // std::println("Process {} failed to allocate {} bytes of memory", proc->getName(), proc->getRequiredMemory());
+    } else {
+        // Memory allocation successful
+        // For debugging
+        // std::println("Process {} allocated {} bytes of memory at address {}", proc->getName(),
+        // proc->getRequiredMemory(), allocatedMemory);
+    }
+
+    return allocatedMemory != nullptr;
+}
+
+// DEPRECATED: This is for Flat Memory Allocator only
+void ProcessScheduler::deallocateProcessMemory(const std::shared_ptr<Process>& proc) const {
+    if (proc->getBaseAddress() != nullptr) {
+        FlatMemoryAllocator::getInstance().deallocate(proc->getBaseAddress(), proc);
+
+        // For debugging
+        // std::println("Process {} deallocated memory at address {}", proc->getName(), proc->getBaseAddress());
     }
 }

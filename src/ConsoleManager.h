@@ -1,6 +1,5 @@
 #pragma once
 
-#include <any>
 #include <memory>
 #include <shared_mutex>
 #include <string>
@@ -40,7 +39,7 @@ public:
 
     /// @brief Adds a new process to the manager.
     /// @param processName the name of the process to be created.
-    /// @return True if the creation was successful, false otehrwise.
+    /// @return True if the creation was successful, false otherwise.
     bool createProcess(const std::string& processName);
     bool createDummyProcess(const std::string& processName);
 
@@ -60,8 +59,7 @@ public:
 
     bool getHasInitialized() const;
 
-    std::unordered_map<std::string, std::shared_ptr<Process>>
-    getProcessNameMap();
+    std::unordered_map<std::string, std::shared_ptr<Process>> getProcessNameMap();
 
     std::shared_ptr<Process> getProcessByPID(int processID);
     std::vector<std::shared_ptr<Process>> getProcessIdList();

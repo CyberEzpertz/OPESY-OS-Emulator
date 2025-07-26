@@ -6,8 +6,6 @@
 #include <string>
 #include <vector>
 
-#include "IMemoryAllocator.h"
-
 class Process;
 
 class PagingAllocator {
