@@ -169,9 +169,6 @@ void ProcessScheduler::dummyGeneratorLoop() {
         if (!generatingDummies)
             break;
 
-        if ((getCurrentCycle() - lastCycle) < interval)
-            continue;
-
         lastCycle = getCurrentCycle();  // time for a new batch!
 
         int id = ConsoleManager::getInstance().getProcessIdList().size();
@@ -217,7 +214,10 @@ void ProcessScheduler::executeFCFS(const std::shared_ptr<Process>& proc, uint64_
 
         ++activeCpuTicks;
         ++coresFinishedThisTick;
-        tickCv.notify_all();
+
+        if (coresFinishedThisTick >= numCpuCores) {
+            tickCv.notify_all();  // only notify when all cores are done
+        }
     }
 }
 
@@ -245,7 +245,10 @@ void ProcessScheduler::executeRR(const std::shared_ptr<Process>& proc, uint64_t&
 
         ++activeCpuTicks;
         ++coresFinishedThisTick;
-        tickCv.notify_all();
+
+        if (coresFinishedThisTick >= numCpuCores) {
+            tickCv.notify_all();  // only notify when all cores are done
+        }
     }
 
     // If process used full quantum and is still running, preempt it
