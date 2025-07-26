@@ -27,10 +27,13 @@ public:
     void stop();
     int getNumAvailableCores() const;
     int getNumTotalCores() const;
+    uint64_t getIdleCPUTicks() const;
+    uint64_t getActiveCPUTicks() const;
+    std::vector<std::shared_ptr<Process>> getCoreAssignments() const;
     void initialize();
     void scheduleProcess(const std::shared_ptr<Process>& process);
     void sleepProcess(const std::shared_ptr<Process>& process);
-    uint64_t getCurrentCycle() const;
+    uint64_t getTotalCPUTicks() const;
     void printQueues() const;
     void startDummyGeneration();
     void stopDummyGeneration();

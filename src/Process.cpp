@@ -371,7 +371,7 @@ std::string Process::generateTimestamp() const {
 std::uint64_t Process::getMemoryUsage() const {
     std::lock_guard lock(scopeMutex);
     uint64_t memoryUsage = 0;
-    auto pageSize = Config::getInstance().getMemPerFrame();
+    const auto pageSize = Config::getInstance().getMemPerFrame();
 
     for (const auto page : pageTable) {
         if (page.isValid)

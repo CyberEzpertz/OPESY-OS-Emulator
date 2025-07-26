@@ -69,6 +69,18 @@ int ProcessScheduler::getNumTotalCores() const {
     return numCpuCores;
 }
 
+uint64_t ProcessScheduler::getIdleCPUTicks() const {
+    return idleCpuTicks;
+}
+
+uint64_t ProcessScheduler::getActiveCPUTicks() const {
+    return activeCpuTicks;
+}
+
+std::vector<std::shared_ptr<Process>> ProcessScheduler::getCoreAssignments() const {
+    return coreAssignments;
+}
+
 void ProcessScheduler::initialize() {
     this->numCpuCores = Config::getInstance().getNumCPUs();
     this->availableCores = Config::getInstance().getNumCPUs();
@@ -89,7 +101,7 @@ void ProcessScheduler::sleepProcess(const std::shared_ptr<Process>& process) {
     }
 }
 
-uint64_t ProcessScheduler::getCurrentCycle() const {
+uint64_t ProcessScheduler::getTotalCPUTicks() const {
     return totalCPUTicks;
 }
 
@@ -154,19 +166,19 @@ void ProcessScheduler::stopDummyGeneration() {
 
 void ProcessScheduler::dummyGeneratorLoop() {
     const auto interval = Config::getInstance().getBatchProcessFreq();
-    uint64_t lastCycle = getCurrentCycle();
+    uint64_t lastCycle = getTotalCPUTicks();
 
     while (generatingDummies) {
         // wait until either: (a) we're told to stop, or (b) enough ticks passed
         {
             std::unique_lock lock(tickMutex);
-            tickCv.wait(lock, [&] { return !generatingDummies || (getCurrentCycle() - lastCycle) >= interval; });
+            tickCv.wait(lock, [&] { return !generatingDummies || (getTotalCPUTicks() - lastCycle) >= interval; });
         }
 
         if (!generatingDummies)
             break;
 
-        lastCycle = getCurrentCycle();  // time for a new batch!
+        lastCycle = getTotalCPUTicks();  // time for a new batch!
 
         int id = ConsoleManager::getInstance().getProcessIdList().size();
         std::string name = std::format("process_{:02d}", id);

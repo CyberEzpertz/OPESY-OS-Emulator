@@ -47,4 +47,6 @@ private:
     static void printPlaceholder(const std::string& command);
     void printProcessReport();
     void generateUtilizationReport();
+    void generateProcessSMI();
+    void generateVmStat();
 };

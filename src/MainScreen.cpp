@@ -136,7 +136,7 @@ void MainScreen::handleUserInput() {
         // Optional: Add a status command for debugging
         ProcessScheduler& scheduler = ProcessScheduler::getInstance();
         std::println("Scheduler Status:");
-        std::println("- CPU Cycles: {}", scheduler.getCurrentCycle());
+        std::println("- CPU Cycles: {}", scheduler.getTotalCPUTicks());
         std::println("- Dummy Generation: {}", scheduler.isGeneratingDummies() ? "Running" : "Stopped");
         std::println("- Available Cores: {}/{}", scheduler.getNumAvailableCores(), scheduler.getNumTotalCores());
         scheduler.printQueues();
@@ -144,6 +144,10 @@ void MainScreen::handleUserInput() {
         generateUtilizationReport();
     } else if (cmd == "visualize") {
         PagingAllocator::getInstance().visualizeMemory();
+    } else if (cmd == "process-smi") {
+        generateProcessSMI();
+    } else if (cmd == "vmstat") {
+        generateVmStat();
     } else {
         std::println("Error: Unknown command {}", cmd);
     }
@@ -210,7 +214,7 @@ void MainScreen::printPlaceholder(const std::string& command) {
 }
 
 void MainScreen::printProcessReport() {
-    ProcessScheduler& scheduler = ProcessScheduler::getInstance();
+    const ProcessScheduler& scheduler = ProcessScheduler::getInstance();
 
     int availableCores = scheduler.getNumAvailableCores();
     int numCores = scheduler.getNumTotalCores();
@@ -350,4 +354,69 @@ void MainScreen::generateUtilizationReport() {
     } catch (const std::exception& e) {
         std::println("Error generating report: {}", e.what());
     }
+}
+
+void MainScreen::generateProcessSMI() {
+    const ProcessScheduler& scheduler = ProcessScheduler::getInstance();
+    const PagingAllocator& allocator = PagingAllocator::getInstance();
+
+    const int availableCores = scheduler.getNumAvailableCores();
+    const int numCores = scheduler.getNumTotalCores();
+    double cpuUtil = static_cast<double>(numCores - availableCores) / numCores * 100.0;
+
+    const auto usedMem = allocator.getUsedMemory();
+    const auto totalMem = Config::getInstance().getMaxOverallMem();
+    const auto memUtil = static_cast<double>(usedMem) / totalMem * 100.0;
+
+    const auto coreAssignments = scheduler.getCoreAssignments();
+    constexpr std::string_view header = "| PROCESS-SMI V01.00 Driver Version: 01.00 |";
+
+    std::println("{}", std::string(header.length(), '-'));
+    std::println(header);
+    std::println("{}", std::string(header.length(), '-'));
+
+    std::println("CPU-Util: {:.0f}%", cpuUtil);
+    std::println("Memory Usage: {}B / {}B", usedMem, totalMem);
+    std::println("Memory Util: {:.0f}%", memUtil);
+    std::println("{}", std::string(header.length(), '='));
+
+    std::println("Running processes and memory usage:");
+    std::println("{}", std::string(header.length(), '-'));
+
+    for (auto process : coreAssignments) {
+        if (process == nullptr)
+            continue;
+        std::println("{}\t {}", process->getName(), process->getMemoryUsage());
+    }
+    std::println("{}", std::string(header.length(), '-'));
+}
+
+void MainScreen::generateVmStat() {
+    const ProcessScheduler& scheduler = ProcessScheduler::getInstance();
+    const PagingAllocator& allocator = PagingAllocator::getInstance();
+
+    const int usedMem = allocator.getUsedMemory();
+    const int totalMem = Config::getInstance().getMaxOverallMem();
+    const int freeMem = totalMem - usedMem;
+
+    const uint64_t idleTicks = scheduler.getIdleCPUTicks();
+    const uint64_t activeTicks = scheduler.getActiveCPUTicks();
+    const uint64_t totalTicks = scheduler.getTotalCPUTicks();
+
+    const int numPagedIn = allocator.getNumPagedIn();
+    const int numPagedOut = allocator.getNumPagedOut();
+
+    std::println("\n===== System Statistics =====");
+    std::println("{:>20} {}", totalMem, "B Total memory");
+    std::println("{:>20} {}", usedMem, "B Used memory");
+    std::println("{:>20} {}", freeMem, "B Free memory");
+
+    std::println("{:>20} {}", idleTicks, "Idle CPU ticks");
+    std::println("{:>20} {}", activeTicks, "Active CPU ticks");
+    std::println("{:>20} {}", totalTicks, "Total CPU ticks");
+
+    std::println("{:>20} {}", numPagedIn, "Pages paged in");
+    std::println("{:>20} {}", numPagedOut, "Pages paged out");
+
+    std::println("==============================\n");
 }
