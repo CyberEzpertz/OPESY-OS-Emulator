@@ -26,19 +26,18 @@ ProcessScheduler::~ProcessScheduler() {
     running = false;
     generatingDummies = false;
 
-    if (tickThread.joinable()) {
+    if (tickThread.joinable())
         tickThread.join();
-    }
 
-    if (dummyGeneratorThread.joinable()) {
+    if (dummyGeneratorThread.joinable())
         dummyGeneratorThread.join();
-    }
 
     for (auto& t : cpuWorkers) {
-        if (t.joinable()) {
+        if (t.joinable())
             t.join();
-        }
     }
+
+    tickBarrier = nullptr;
 }
 
 void ProcessScheduler::start() {
@@ -83,7 +82,8 @@ void ProcessScheduler::initialize() {
     this->availableCores = Config::getInstance().getNumCPUs();
     coreAssignments.resize(numCpuCores);  // One slot per core
 
-    tickBarrier = std::make_unique<std::barrier<std::function<void()>>>(numCpuCores + 1, [&] { incrementCpuTicks(); });
+    tickBarrier =
+        std::make_unique<std::barrier<std::function<void()>>>(numCpuCores + 1, [this] { incrementCpuTicks(); });
 }
 
 void ProcessScheduler::scheduleProcess(const std::shared_ptr<Process>& process) {
@@ -105,11 +105,6 @@ uint64_t ProcessScheduler::getTotalCPUTicks() const {
 }
 
 void ProcessScheduler::incrementCpuTicks() {
-    if (!running) {
-        // Safe to destroy or nullify tickBarrier here
-        tickBarrier = nullptr;
-    }
-
     // Wakeup all sleeping processes that need to wakeup
     {
         std::lock_guard lock(waitMutex);
@@ -123,8 +118,7 @@ void ProcessScheduler::incrementCpuTicks() {
 
             if (proc->getIsFinished()) {
                 proc->setStatus(DONE);
-                // Deallocate memory for finished process
-                deallocateProcessMemory(proc);
+                PagingAllocator::getInstance().deallocate(proc->getID());
             } else {
                 proc->setStatus(READY);
                 scheduleProcess(proc);
