@@ -1,8 +1,10 @@
 #pragma once
 
 #include <atomic>
+#include <barrier>
 #include <condition_variable>
 #include <deque>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <queue>
@@ -71,6 +73,7 @@ private:
     std::condition_variable tickCv;
     std::mutex tickMutex;
     std::atomic<int> coresFinishedThisTick = 0;
+    std::unique_ptr<std::barrier<std::function<void()>>> tickBarrier;
 
     std::vector<std::thread> cpuWorkers;
     std::atomic<uint64_t> totalCPUTicks{0};
