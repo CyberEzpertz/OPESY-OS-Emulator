@@ -105,6 +105,15 @@ int PagingAllocator::getUsedMemory() const {
     const int usedMemory = allocatedFrames * Config::getInstance().getMemPerFrame();
     return usedMemory;
 }
+
+int PagingAllocator::getNumPagedIn() const {
+    return numPagedIn;
+}
+
+int PagingAllocator::getNumPagedOut() const {
+    return numPagedOut;
+}
+
 int PagingAllocator::getFreeMemory() const {
     return Config::getInstance().getMaxOverallMem() - getUsedMemory();
 }

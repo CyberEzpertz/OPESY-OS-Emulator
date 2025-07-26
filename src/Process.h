@@ -118,6 +118,7 @@ public:
 
     void writeToHeap(int address, uint16_t value);
     uint16_t readFromHeap(int address);
+    std::uint64_t getMemoryUsage() const;
 
 private:
     int processID;                  ///< Unique identifier for the process.
@@ -136,8 +137,8 @@ private:
     std::unordered_map<std::string, uint16_t> variables;
     uint64_t wakeupTick;
     uint64_t lastInstructionCycle = 0;
-    std::mutex scopeMutex;
-    std::mutex instructionsMutex;
+    mutable std::mutex scopeMutex;
+    mutable std::mutex instructionsMutex;
 
     std::vector<PageEntry> pageTable;
     std::set<int> symbolTablePages;

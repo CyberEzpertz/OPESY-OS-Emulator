@@ -1,8 +1,10 @@
 #pragma once
 
 #include <atomic>
+#include <barrier>
 #include <condition_variable>
 #include <deque>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <queue>
@@ -27,10 +29,13 @@ public:
     void stop();
     int getNumAvailableCores() const;
     int getNumTotalCores() const;
+    uint64_t getIdleCPUTicks() const;
+    uint64_t getActiveCPUTicks() const;
+    std::vector<std::shared_ptr<Process>> getCoreAssignments() const;
     void initialize();
     void scheduleProcess(const std::shared_ptr<Process>& process);
     void sleepProcess(const std::shared_ptr<Process>& process);
-    uint64_t getCurrentCycle() const;
+    uint64_t getTotalCPUTicks() const;
     void printQueues() const;
     void startDummyGeneration();
     void stopDummyGeneration();
@@ -53,10 +58,11 @@ private:
     // Memory management methods
     bool tryAllocateMemory(std::shared_ptr<Process>& proc);
     void deallocateProcessMemory(const std::shared_ptr<Process>& proc) const;
-    void resetCore(std::shared_ptr<Process>& proc);
+    void resetCore(std::shared_ptr<Process>& proc, int coreId);
 
     int numCpuCores;
     std::atomic<int> availableCores;
+    std::vector<std::shared_ptr<Process>> coreAssignments;
 
     std::deque<std::shared_ptr<Process>> readyQueue;
     std::mutex readyMutex;
@@ -67,6 +73,7 @@ private:
     std::condition_variable tickCv;
     std::mutex tickMutex;
     std::atomic<int> coresFinishedThisTick = 0;
+    std::unique_ptr<std::barrier<std::function<void()>>> tickBarrier;
 
     std::vector<std::thread> cpuWorkers;
     std::atomic<uint64_t> totalCPUTicks{0};

@@ -1,6 +1,7 @@
 #include "ProcessScheduler.h"
 
 #include <chrono>
+#include <functional>
 #include <print>
 #include <thread>
 
@@ -25,22 +26,18 @@ ProcessScheduler::~ProcessScheduler() {
     running = false;
     generatingDummies = false;
 
-    // Wake all threads
-    tickCv.notify_all();
-
-    if (tickThread.joinable()) {
+    if (tickThread.joinable())
         tickThread.join();
-    }
 
-    if (dummyGeneratorThread.joinable()) {
+    if (dummyGeneratorThread.joinable())
         dummyGeneratorThread.join();
-    }
 
     for (auto& t : cpuWorkers) {
-        if (t.joinable()) {
+        if (t.joinable())
             t.join();
-        }
     }
+
+    tickBarrier = nullptr;
 }
 
 void ProcessScheduler::start() {
@@ -58,7 +55,6 @@ void ProcessScheduler::start() {
 void ProcessScheduler::stop() {
     running = false;
     generatingDummies = false;
-    tickCv.notify_all();
 }
 
 int ProcessScheduler::getNumAvailableCores() const {
@@ -69,9 +65,25 @@ int ProcessScheduler::getNumTotalCores() const {
     return numCpuCores;
 }
 
+uint64_t ProcessScheduler::getIdleCPUTicks() const {
+    return idleCpuTicks;
+}
+
+uint64_t ProcessScheduler::getActiveCPUTicks() const {
+    return activeCpuTicks;
+}
+
+std::vector<std::shared_ptr<Process>> ProcessScheduler::getCoreAssignments() const {
+    return coreAssignments;
+}
+
 void ProcessScheduler::initialize() {
     this->numCpuCores = Config::getInstance().getNumCPUs();
     this->availableCores = Config::getInstance().getNumCPUs();
+    coreAssignments.resize(numCpuCores);  // One slot per core
+
+    tickBarrier =
+        std::make_unique<std::barrier<std::function<void()>>>(numCpuCores + 1, [this] { incrementCpuTicks(); });
 }
 
 void ProcessScheduler::scheduleProcess(const std::shared_ptr<Process>& process) {
@@ -88,18 +100,11 @@ void ProcessScheduler::sleepProcess(const std::shared_ptr<Process>& process) {
     }
 }
 
-uint64_t ProcessScheduler::getCurrentCycle() const {
+uint64_t ProcessScheduler::getTotalCPUTicks() const {
     return totalCPUTicks;
 }
 
 void ProcessScheduler::incrementCpuTicks() {
-    {
-        std::unique_lock lock(tickMutex);
-
-        // Only tick when all cores are finished executing an instruction
-        tickCv.wait(lock, [&] { return coresFinishedThisTick >= numCpuCores || totalCPUTicks == 0; });
-    }
-
     // Wakeup all sleeping processes that need to wakeup
     {
         std::lock_guard lock(waitMutex);
@@ -113,8 +118,7 @@ void ProcessScheduler::incrementCpuTicks() {
 
             if (proc->getIsFinished()) {
                 proc->setStatus(DONE);
-                // Deallocate memory for finished process
-                deallocateProcessMemory(proc);
+                PagingAllocator::getInstance().deallocate(proc->getID());
             } else {
                 proc->setStatus(READY);
                 scheduleProcess(proc);
@@ -122,9 +126,8 @@ void ProcessScheduler::incrementCpuTicks() {
         }
     }
 
+    tickCv.notify_all();
     ++totalCPUTicks;
-    coresFinishedThisTick = 0;
-    tickCv.notify_all();  // Notify all worker threads that a new tick occurred
 }
 
 void ProcessScheduler::startDummyGeneration() {
@@ -143,7 +146,6 @@ void ProcessScheduler::stopDummyGeneration() {
         std::println("Dummy process generation is not currently running.");
         return;
     }
-    tickCv.notify_all();  // wake the loop above
 
     if (dummyGeneratorThread.joinable())
         dummyGeneratorThread.join();
@@ -153,19 +155,19 @@ void ProcessScheduler::stopDummyGeneration() {
 
 void ProcessScheduler::dummyGeneratorLoop() {
     const auto interval = Config::getInstance().getBatchProcessFreq();
-    uint64_t lastCycle = getCurrentCycle();
+    uint64_t lastCycle = getTotalCPUTicks();
 
     while (generatingDummies) {
         // wait until either: (a) we're told to stop, or (b) enough ticks passed
         {
             std::unique_lock lock(tickMutex);
-            tickCv.wait(lock, [&] { return !generatingDummies || (getCurrentCycle() - lastCycle) >= interval; });
+            tickCv.wait(lock, [&] { return !generatingDummies || (getTotalCPUTicks() - lastCycle) >= interval; });
         }
 
         if (!generatingDummies)
             break;
 
-        lastCycle = getCurrentCycle();  // time for a new batch!
+        lastCycle = getTotalCPUTicks();  // time for a new batch!
 
         int id = ConsoleManager::getInstance().getProcessIdList().size();
         std::string name = std::format("process_{:02d}", id);
@@ -186,34 +188,26 @@ void ProcessScheduler::printQueues() const {
 void ProcessScheduler::tickLoop() {
     while (running) {
         std::this_thread::sleep_for(1ms);  // Simulate one tick every 1ms
-        incrementCpuTicks();
+        tickBarrier->arrive_and_wait();
     }
+    tickBarrier->arrive_and_drop();
 }
 
 void ProcessScheduler::executeFCFS(const std::shared_ptr<Process>& proc, uint64_t& lastTickSeen) {
     // FCFS: Run until process is finished or blocked
     const uint32_t delayCycles = Config::getInstance().getDelaysPerExec();
     while (proc && proc->getStatus() == RUNNING) {
-        // Wait for next tick before executing next instruction
-        {
-            std::unique_lock lock(tickMutex);
-            tickCv.wait(lock, [&] { return totalCPUTicks > lastTickSeen || !running; });
+        if (!running)
+            break;
 
-            if (!running)
-                break;
-            lastTickSeen = totalCPUTicks;
-        }
+        lastTickSeen = totalCPUTicks;
 
         if (delayCycles == 0 || totalCPUTicks % delayCycles == 0) {
             proc->incrementLine();
         }
 
         ++activeCpuTicks;
-        ++coresFinishedThisTick;
-
-        if (coresFinishedThisTick >= numCpuCores) {
-            tickCv.notify_all();  // only notify when all cores are done
-        }
+        tickBarrier->arrive_and_wait();
     }
 }
 
@@ -224,15 +218,9 @@ void ProcessScheduler::executeRR(const std::shared_ptr<Process>& proc, uint64_t&
     const auto quantumCycles = Config::getInstance().getQuantumCycles();
 
     while (proc && proc->getStatus() == RUNNING && cyclesExecuted < quantumCycles) {
-        // Wait for next tick before executing next instruction
-        {
-            std::unique_lock lock(tickMutex);
-            tickCv.wait(lock, [&] { return totalCPUTicks > lastTickSeen || !running; });
-
-            if (!running)
-                break;
-            lastTickSeen = totalCPUTicks;
-        }
+        if (!running)
+            break;
+        lastTickSeen = totalCPUTicks;
 
         if (delayCycles == 0 || totalCPUTicks % delayCycles == 0) {
             proc->incrementLine();
@@ -240,11 +228,7 @@ void ProcessScheduler::executeRR(const std::shared_ptr<Process>& proc, uint64_t&
         }
 
         ++activeCpuTicks;
-        ++coresFinishedThisTick;
-
-        if (coresFinishedThisTick >= numCpuCores) {
-            tickCv.notify_all();  // only notify when all cores are done
-        }
+        tickBarrier->arrive_and_wait();
     }
 
     // If process used full quantum and is still running, preempt it
@@ -254,7 +238,7 @@ void ProcessScheduler::executeRR(const std::shared_ptr<Process>& proc, uint64_t&
     }
 }
 
-void ProcessScheduler::resetCore(std::shared_ptr<Process>& proc) {
+void ProcessScheduler::resetCore(std::shared_ptr<Process>& proc, int coreId) {
     // Check if process is finished
     if (proc->getIsFinished()) {
         proc->setStatus(DONE);
@@ -266,6 +250,7 @@ void ProcessScheduler::resetCore(std::shared_ptr<Process>& proc) {
     proc->setCurrentCore(-1);
     proc = nullptr;
     availableCores += 1;
+    coreAssignments[coreId] = nullptr;  // Clear assignment
 }
 
 void ProcessScheduler::workerLoop(const int coreId) {
@@ -275,15 +260,6 @@ void ProcessScheduler::workerLoop(const int coreId) {
 
     while (running) {
         lastTickSeen = totalCPUTicks;
-
-        // Wait for tick to be updated
-        {
-            std::unique_lock lock(tickMutex);
-            tickCv.wait(lock, [&] { return totalCPUTicks > lastTickSeen || !running; });
-
-            if (!running)
-                break;
-        }
 
         // Get a process from the queue
         {
@@ -296,15 +272,14 @@ void ProcessScheduler::workerLoop(const int coreId) {
                 proc->setStatus(RUNNING);
                 proc->setCurrentCore(coreId);
                 availableCores -= 1;
+
+                coreAssignments[coreId] = proc;
             }
         }
 
-        // Idle if core wasn't able to find a process
         if (!proc) {
             idleCpuTicks += 1;
-            coresFinishedThisTick += 1;
-            tickCv.notify_all();
-
+            tickBarrier->arrive_and_wait();
             continue;
         }
 
@@ -315,8 +290,10 @@ void ProcessScheduler::workerLoop(const int coreId) {
             executeRR(proc, lastTickSeen);
         }
 
-        resetCore(proc);
+        resetCore(proc, coreId);
     }
+
+    tickBarrier->arrive_and_drop();
 }
 
 // DEPRECATED: This is for Flat Memory Allocator only

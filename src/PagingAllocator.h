@@ -27,6 +27,8 @@ public:
     void visualizeMemory();
 
     int getUsedMemory() const;
+    int getNumPagedIn() const;
+    int getNumPagedOut() const;
     int getFreeMemory() const;
 
 private:
