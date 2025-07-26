@@ -5,6 +5,7 @@
 #include "PagingAllocator.h"
 
 #include <fstream>
+#include <print>
 
 #include "Config.h"
 #include "ConsoleManager.h"
@@ -15,7 +16,7 @@ PagingAllocator& PagingAllocator::getInstance() {
     return *instance;
 }
 
-static constexpr const char* BACKING_STORE_FILE = "csopesy-backing-store.txt";
+static constexpr auto BACKING_STORE_FILE = "csopesy-backing-store.txt";
 
 void PagingAllocator::handlePageFault(const int pid, const int pageNumber) {
     const auto process = ConsoleManager::getInstance().getProcessByPID(pid);
@@ -82,9 +83,24 @@ void PagingAllocator::deallocate(const int pid) {
     std::remove(BACKING_STORE_FILE);
     std::rename("temp.txt", BACKING_STORE_FILE);
 }
-void PagingAllocator::visualizeMemory(int quantumCycle) {
-    // TODO: Add visualization here
+
+void PagingAllocator::visualizeMemory() {
+    std::println("\n=== Memory Frame Table ===");
+    std::println("{:>6} | {:>10} | {:>10}", "Frame", "Process ID", "Page #");
+    std::println("--------+------------+------------");
+
+    for (size_t i = 0; i < frameTable.size(); ++i) {
+        const auto& [pid, pageNumber] = frameTable[i];
+        if (pid == -1) {
+            std::println("{:>6} | {:>10} | {:>10}", i, "-", "-");
+        } else {
+            std::println("{:>6} | {:>10} | {:>10}", i, pid, pageNumber);
+        }
+    }
+
+    std::println("================================\n");
 }
+
 int PagingAllocator::getUsedMemory() const {
     const int usedMemory = allocatedFrames * Config::getInstance().getMemPerFrame();
     return usedMemory;
@@ -103,6 +119,9 @@ PagingAllocator::PagingAllocator() {
     for (int i = 0; i < static_cast<int>(totalFrames); ++i) {
         freeFrameIndices.push_back(i);
     }
+
+    // If the backing store exists, clear it.
+    std::ofstream backingStore(BACKING_STORE_FILE, std::ios::trunc);
 }
 
 int PagingAllocator::allocateFrame(const int pid, const int pageNumber) {

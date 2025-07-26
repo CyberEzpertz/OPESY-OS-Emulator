@@ -4,6 +4,7 @@
 
 #include "InstructionFactory.h"
 #include "MainScreen.h"
+#include "PagingAllocator.h"
 #include "Process.h"
 #include "ProcessScheduler.h"
 #include "ProcessScreen.h"
@@ -12,11 +13,12 @@
 void ConsoleManager::initialize() {
     hasInitialized = true;
     Config::getInstance().loadFromFile();
+    PagingAllocator::getInstance();
     ProcessScheduler::getInstance().initialize();
     ProcessScheduler::getInstance().start();
 
     // NOTE: This is for debugging only.
-    // Config::getInstance().print();
+    Config::getInstance().print();
 }
 
 void ConsoleManager::initMainScreen() {
@@ -41,8 +43,7 @@ void ConsoleManager::switchConsole(const std::string& processName) {
         if (processNameMap[processName]->getStatus() == ProcessStatus::DONE) {
             std::println("Process {} not found.", processName);
         } else {
-            currentScreen =
-                std::make_shared<ProcessScreen>(processNameMap[processName]);
+            currentScreen = std::make_shared<ProcessScreen>(processNameMap[processName]);
             clearConsole();
             currentScreen->render();
         }
@@ -67,8 +68,7 @@ bool ConsoleManager::createProcess(const std::string& processName) {
     processNameMap[processName] = newProcess;
     processIDList.push_back(newProcess);
 
-    const auto instructions =
-        InstructionFactory::createAlternatingPrintAdd(PID);
+    const auto instructions = InstructionFactory::createAlternatingPrintAdd(PID);
     newProcess->setInstructions(instructions);
     ProcessScheduler::getInstance().scheduleProcess(newProcess);
 
@@ -85,7 +85,11 @@ bool ConsoleManager::createDummyProcess(const std::string& processName) {
     std::unique_lock lock(processListMutex);
     const int PID = processNameMap.size();
 
-    const auto newProcess = std::make_shared<Process>(PID, processName);
+    const auto minMem = Config::getInstance().getMinMemPerProc();
+    const auto maxMem = Config::getInstance().getMaxMemPerProc();
+    const auto requiredMemory = InstructionFactory::generateRandomNum(minMem, maxMem);
+
+    const auto newProcess = std::make_shared<Process>(PID, processName, requiredMemory);
     processNameMap[processName] = newProcess;
     processIDList.push_back(newProcess);
 
@@ -132,8 +136,7 @@ void ConsoleManager::exitProgram() {
 bool ConsoleManager::getHasInitialized() const {
     return hasInitialized;
 }
-std::unordered_map<std::string, std::shared_ptr<Process>>
-ConsoleManager::getProcessNameMap() {
+std::unordered_map<std::string, std::shared_ptr<Process>> ConsoleManager::getProcessNameMap() {
     std::shared_lock lock(processListMutex);
     return processNameMap;
 }

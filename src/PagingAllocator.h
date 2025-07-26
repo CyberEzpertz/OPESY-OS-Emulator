@@ -26,7 +26,7 @@ public:
     void deallocate(int pid);
 
     // Visualize memory as frame map with process and page info
-    void visualizeMemory(int quantumCycle);
+    void visualizeMemory();
 
     int getUsedMemory() const;
     int getFreeMemory() const;

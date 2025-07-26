@@ -144,10 +144,10 @@ private:
 
     std::vector<uint16_t> heapMemory;
     size_t maxHeapMemory;
-    int heapStartPage;
-    int heapStartOffset;
+    int heapStartPage = 0;
+    int heapStartOffset = 0;
 
-    bool didShutdown;
+    bool didShutdown = false;
     std::string shutdownDetails;
 
     /**

@@ -17,8 +17,10 @@
 #include "Config.h"
 #include "PagingAllocator.h"
 
+// If INSTRUCTION_SIZE is 0, we assume it doesn't count toward paging
+constexpr int INSTRUCTION_SIZE = 0;
+
 constexpr int MAX_VARIABLES = 32;
-constexpr int INSTRUCTION_SIZE = 4;
 constexpr int VARIABLE_SIZE = 2;
 
 // Common constructor with all parameters
@@ -31,7 +33,8 @@ Process::Process(const int id, const std::string& name, const uint64_t requiredM
       status(READY),
       currentCore(-1),
       variables({}),
-      wakeupTick(0) {
+      wakeupTick(0),
+      maxHeapMemory(0) {
     totalLines = 0;
     for (const auto& instr : instructions) {
         totalLines += instr->getLineCount();
@@ -107,11 +110,12 @@ void Process::log(const std::string& entry) {
 void Process::incrementLine() {
     std::lock_guard lock(instructionsMutex);
     if (currentLine < totalLines) {
-        const int instructionPage = (currentLine * INSTRUCTION_SIZE) / Config::getInstance().getMemPerFrame();
-
-        if (!pageTable[instructionPage].isValid) {
-            PagingAllocator::getInstance().handlePageFault(this->processID, instructionPage);
-        }
+        // [IMPORTANT] This commented code is if instructions are used in paging, uncomment if needed
+        // const int instructionPage = (currentLine * INSTRUCTION_SIZE) / Config::getInstance().getMemPerFrame();
+        //
+        // if (!pageTable[instructionPage].isValid) {
+        //     PagingAllocator::getInstance().handlePageFault(this->processID, instructionPage);
+        // }
 
         instructions[currentInstructionIndex]->execute();
 
@@ -150,12 +154,13 @@ void Process::setInstructions(const std::vector<std::shared_ptr<Instruction>>& i
         this->totalLines += instr->getLineCount();
     }
 
-    const int pageSize = Config::getInstance().getMemPerFrame();
+    const int pageSize = static_cast<int>(Config::getInstance().getMemPerFrame());
 
-    const int numPages = requiredMemory / pageSize;
+    const size_t numPages = requiredMemory / pageSize;
     pageTable.resize(numPages);
 
     // Calculate where the heap begins
+
     const int symbolTableStartByte = totalLines * INSTRUCTION_SIZE;
     const int symbolTableEndByte = symbolTableStartByte + MAX_VARIABLES * 2;
 
@@ -170,7 +175,7 @@ void Process::setInstructions(const std::vector<std::shared_ptr<Instruction>>& i
     heapStartPage = symbolTableEndByte / pageSize;
     heapStartOffset = symbolTableEndByte % pageSize;
 
-    const int heapBytes = requiredMemory - (heapStartPage * pageSize + heapStartOffset);
+    const int heapBytes = numPages * pageSize - (heapStartPage * pageSize + heapStartOffset);
     heapMemory.resize(heapBytes);
 }
 
@@ -272,7 +277,7 @@ void Process::swapPageIn(const int pageNumber, const int frameNumber) {
 }
 
 void Process::writeToHeap(const int address, const uint16_t value) {
-    const int pageSize = Config::getInstance().getMemPerFrame();
+    const auto pageSize = Config::getInstance().getMemPerFrame();
     const int totalOffset = heapStartOffset + address;
     const int pageNumber = heapStartPage + (totalOffset / pageSize);
 
