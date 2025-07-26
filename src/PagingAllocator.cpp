@@ -11,12 +11,12 @@
 #include "ConsoleManager.h"
 #include "Process.h"
 
+static constexpr auto BACKING_STORE_FILE = "csopesy-backing-store.txt";
+
 PagingAllocator& PagingAllocator::getInstance() {
     static auto* instance = new PagingAllocator();
     return *instance;
 }
-
-static constexpr auto BACKING_STORE_FILE = "csopesy-backing-store.txt";
 
 void PagingAllocator::handlePageFault(const int pid, const int pageNumber) {
     const auto process = ConsoleManager::getInstance().getProcessByPID(pid);
@@ -116,7 +116,7 @@ PagingAllocator::PagingAllocator() {
     this->totalFrames = overallMem / frameSize;
     frameTable.resize(totalFrames);
 
-    for (int i = 0; i < static_cast<int>(totalFrames); ++i) {
+    for (size_t i = 0; i < totalFrames; ++i) {
         freeFrameIndices.push_back(i);
     }
 
@@ -135,7 +135,7 @@ int PagingAllocator::allocateFrame(const int pid, const int pageNumber) {
     frameTable[frameIndex] = {pid, pageNumber};
     oldFramesQueue.push_back(frameIndex);
 
-    allocatedFrames++;
+    ++allocatedFrames;
 
     return frameIndex;
 }
@@ -179,7 +179,7 @@ void PagingAllocator::freeFrame(const int frameIndex) {
     // Remove the frame from the old frames queue
     std::erase(oldFramesQueue, frameIndex);
 
-    allocatedFrames--;
+    --allocatedFrames;
 }
 
 void PagingAllocator::swapOut(const int frameIndex) {

@@ -49,7 +49,7 @@ private:
     };
 
     size_t totalFrames;
-    size_t allocatedFrames = 0;
+    std::atomic<size_t> allocatedFrames = 0;
 
     std::vector<FrameInfo> frameTable;
     std::deque<int> freeFrameIndices;
