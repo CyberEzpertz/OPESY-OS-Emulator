@@ -25,9 +25,13 @@ void PagingAllocator::handlePageFault(const int pid, const int pageNumber) {
 
     const PageEntry entry = process->getPageEntry(pageNumber);
 
+    std::vector<StoredData> pageData;
+
     // If the entry was swapped out, this will trigger
     if (entry.inBackingStore) {
-        swapIn(pid, pageNumber);
+        pageData = swapIn(pid, pageNumber);
+    } else {
+        pageData = process->getPageData(pageNumber);
     }
 
     int frameIndex = allocateFrame(pid, pageNumber);
@@ -116,6 +120,14 @@ int PagingAllocator::getNumPagedOut() const {
 
 int PagingAllocator::getFreeMemory() const {
     return Config::getInstance().getMaxOverallMem() - getUsedMemory();
+}
+StoredData PagingAllocator::readFromFrame(const int frameNumber, const int offset) const {
+    std::lock_guard lock(pagingMutex);
+    return frameTable[frameNumber].data[offset];
+}
+void PagingAllocator::writeToFrame(const int frameNumber, const int offset, const uint16_t data) {
+    std::lock_guard lock(pagingMutex);
+    frameTable[frameNumber].data[offset] = data;
 }
 
 PagingAllocator::PagingAllocator() {
@@ -219,32 +231,47 @@ void PagingAllocator::swapOut(const int frameIndex) {
     freeFrame(frameIndex);
 }
 
-void PagingAllocator::swapIn(const int pid, int pageNumber) const {
-    // Read the previous contents
+std::vector<StoredData> PagingAllocator::swapIn(const int pid, int pageNumber) const {
     std::ifstream backingFile(BACKING_STORE_FILE);
-
-    // Will replace the old backing store
     std::ofstream tempFile("temp.txt");
 
+    if (!backingFile.is_open()) {
+        throw std::runtime_error("Failed to open backing store file.");
+    }
+
+    if (!tempFile.is_open()) {
+        throw std::runtime_error("Failed to open temporary backing store file.");
+    }
+
+    std::vector<StoredData> storedData;
     std::string line;
+
     while (std::getline(backingFile, line)) {
         std::istringstream iss(line);
         int readPID, page;
-        if (!(iss >> readPID >> page))
-            throw std::runtime_error("Backing store file is malformed, please check it.");
+        if (!(iss >> readPID >> page)) {
+            throw std::runtime_error("Backing store file is malformed.");
+        }
 
-        // Skip the page to be loaded back in
         if (readPID == pid && page == pageNumber) {
+            // Read remaining parts of the line as stored bytes
+            int byteValue;
+            while (iss >> byteValue) {
+                storedData.push_back(static_cast<uint8_t>(byteValue));
+            }
+            // Don't copy this line to temp (we're swapping it in)
             continue;
         }
 
-        tempFile << line << "\n";  // Keep all other lines
+        // Keep other lines
+        tempFile << line << "\n";
     }
 
     backingFile.close();
     tempFile.close();
 
-    // 3. Replace the backing store with the temp file
     std::remove(BACKING_STORE_FILE);
     std::rename("temp.txt", BACKING_STORE_FILE);
+
+    return storedData;
 }

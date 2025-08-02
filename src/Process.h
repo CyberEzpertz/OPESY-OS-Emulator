@@ -5,16 +5,16 @@
 #pragma once
 
 #include <atomic>
-#include <set>
 #include <shared_mutex>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
 #include "Instruction.h"
-#include "PrintInstruction.h"
+#include "PagingAllocator.h"
 
 enum ProcessStatus { READY, RUNNING, WAITING, DONE };
+enum MemorySegment { TEXT, DATA, HEAP };
 
 struct PageEntry {
     int frameNumber = -1;
@@ -112,6 +112,7 @@ public:
     void setBaseAddress(void* ptr);
     void* getBaseAddress() const;
     PageEntry getPageEntry(int pageNumber) const;
+    std::vector<StoredData> getPageData(int pageNumber) const;
 
     void swapPageOut(int pageNumber);
     void swapPageIn(int pageNumber, int frameNumber);
@@ -134,22 +135,25 @@ private:
     std::string timestamp;        ///< Timestamp when the process was created.
     std::atomic<ProcessStatus> status;
     std::atomic<int> currentCore;
-    std::vector<std::shared_ptr<Instruction>> instructions;
-    std::unordered_map<std::string, uint16_t> variables;
     uint64_t wakeupTick;
     uint64_t lastInstructionCycle = 0;
-    mutable std::mutex scopeMutex;
+
+    // Upper boundary of each memory segment(text, data, etc.)
+    std::unordered_map<MemorySegment, uint16_t> segmentBoundaries;
+
+    std::vector<std::shared_ptr<Instruction>> instructions;
     mutable std::mutex instructionsMutex;
 
+    std::unordered_map<std::string, uint16_t> variableAddresses;
+    std::vector<std::string> variableOrder;
+    mutable std::mutex variableMutex;
+
+    mutable std::mutex heapMutex;
+
+    static std::pair<int, int> splitAddress(int address);
+
     std::vector<PageEntry> pageTable;
-    std::set<int> symbolTablePages;
 
-    std::vector<uint16_t> heapMemory;
-    size_t maxHeapMemory;
-    int heapStartPage = 0;
-    int heapStartOffset = 0;
-
-    int convertAddressToHeapIdx(int address) const;
     bool isValidHeapAddress(int address) const;
 
     bool didShutdown = false;
@@ -159,5 +163,5 @@ private:
      * @brief Generates a formatted timestamp for the process creation time.
      * @return A string with the current local date and time.
      */
-    std::string generateTimestamp() const;
+    static std::string generateTimestamp();
 };

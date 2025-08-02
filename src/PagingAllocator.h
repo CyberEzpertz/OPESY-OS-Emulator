@@ -6,7 +6,16 @@
 #include <shared_mutex>
 #include <vector>
 
+class Instruction;
 class Process;
+
+using StoredData = std::variant<uint16_t, std::shared_ptr<Instruction>>;
+
+struct FrameInfo {
+    int pid = -1;
+    int pageNumber = -1;
+    std::vector<StoredData> data;
+};
 
 class PagingAllocator {
 public:
@@ -31,6 +40,9 @@ public:
     int getNumPagedOut() const;
     int getFreeMemory() const;
 
+    StoredData readFromFrame(int frameNumber, int offset) const;
+    void writeToFrame(int frameNumber, int offset, const uint16_t data);
+
 private:
     PagingAllocator();
 
@@ -40,13 +52,7 @@ private:
     void freeFrame(int frameIndex);
 
     void swapOut(int frameIndex);
-    void swapIn(int pid, int pageNumber) const;
-
-    // Frame table metadata
-    struct FrameInfo {
-        int pid = -1;
-        int pageNumber = -1;
-    };
+    std::vector<StoredData> swapIn(int pid, int pageNumber) const;
 
     size_t totalFrames;
     std::atomic<size_t> allocatedFrames = 0;
