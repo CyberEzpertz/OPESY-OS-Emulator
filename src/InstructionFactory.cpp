@@ -14,11 +14,15 @@
 #include "ForInstruction.h"
 #include "PrintInstruction.h"
 #include "SleepInstruction.h"
+#include "WriteInstruction.h"
+#include "ReadInstruction.h"
 
 std::mt19937 InstructionFactory::rng(std::random_device{}());
 
 constexpr int MAX_NESTED_LEVELS = 3;
 constexpr int MAX_VARIABLES = 32;
+constexpr int INSTRUCTION_SIZE = 2;
+constexpr int SYMBOL_TABLE_SIZE = 64;
 
 std::string getNewVarName(const std::set<std::string>& declaredVars) {
     size_t totalVars = declaredVars.size();
@@ -102,7 +106,7 @@ std::shared_ptr<Instruction> InstructionFactory::createRandomInstruction(const i
 
     const bool isLoopable = currentNestLevel < MAX_NESTED_LEVELS && maxLines > 1;
 
-    switch (generateRandomNum(0, isLoopable ? 5 : 4)) {
+    switch (generateRandomNum(0, isLoopable ? 7 : 6)) {
         case 0: {  // PRINT VARIABLE VALUE
             // Check if any variables exist across all scopes
             bool hasVariables = false;
@@ -160,6 +164,26 @@ std::shared_ptr<Instruction> InstructionFactory::createRandomInstruction(const i
         }
         case 5: {
             return createForLoop(pid, processName, maxLines, declaredVars, currentNestLevel + 1);
+        }
+        case 6: {  // WRITE(address, value)
+            const auto& config = Config::getInstance();
+            uint64_t instrMemSize = (maxLines + 1) * INSTRUCTION_SIZE;
+            uint64_t memOffset = generateRandomNum(config.getMinMemPerProc(), config.getMaxMemPerProc());
+            uint64_t usableMemory = instrMemSize + SYMBOL_TABLE_SIZE + memOffset;
+
+            int address = generateRandomNum(instrMemSize, static_cast<int>(usableMemory - 2));
+            uint16_t value = getRandomUint16();
+            return std::make_shared<WriteInstruction>(address, value, pid);
+        }
+        case 7: {  // READ(var, address)
+            const auto& config = Config::getInstance();
+            std::string result = getRandomVarName(declaredVars);
+            uint64_t instrMemSize = (maxLines + 1) * INSTRUCTION_SIZE;
+            uint64_t memOffset = generateRandomNum(config.getMinMemPerProc(), config.getMaxMemPerProc());
+            uint64_t usableMemory = instrMemSize + SYMBOL_TABLE_SIZE + memOffset;
+
+            int address = generateRandomNum(instrMemSize, static_cast<int>(usableMemory - 2));
+            return std::make_shared<ReadInstruction>(result,address,pid);
         }
         default:;
     }

@@ -312,12 +312,11 @@ bool Process::isValidHeapAddress(const int address) const {
 // Writes to given address if possible, shuts down if not
 void Process::writeToHeap(const int address, const uint16_t value) {
     const auto pageSize = Config::getInstance().getMemPerFrame();
-    const int totalOffset = heapStartOffset + address;
-    const int pageNumber = heapStartPage + (totalOffset / pageSize);
+    const int pageNumber = address / pageSize;
 
     // Invalid memory access criteria:
     // 1. Address is outside of heap bounds
-    if (isValidHeapAddress(address)) {
+    if (!isValidHeapAddress(address)) {
         shutdown(address);
         return;
     }
@@ -336,13 +335,12 @@ void Process::writeToHeap(const int address, const uint16_t value) {
 // Reads the given address if possible, shuts down if not
 uint16_t Process::readFromHeap(const int address) {
     const auto pageSize = Config::getInstance().getMemPerFrame();
-    const int totalOffset = heapStartOffset + address;
-    const int pageNumber = heapStartPage + (totalOffset / pageSize);
+    const int pageNumber = address / pageSize;
 
     // Invalid memory access criteria:
     // 1. Address is outside of heap bounds
     // 2. Address is inside, but it's an odd number
-    if (isValidHeapAddress(address)) {
+    if (!isValidHeapAddress(address)) {
         shutdown(address);
         return 0;
     }
