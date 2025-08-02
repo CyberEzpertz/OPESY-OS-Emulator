@@ -94,13 +94,13 @@ public:
 
     void setCurrentCore(int coreId);
     int getCurrentCore() const;
-    void setInstructions(const std::vector<std::shared_ptr<Instruction>>& instructions);
+    void setInstructions(const std::vector<std::shared_ptr<Instruction>>& instructions, bool addToMemory = false);
     bool setVariable(const std::string& name, uint16_t value);
     bool getIsFinished() const;
     uint16_t getVariable(const std::string& name);
     uint64_t getWakeupTick() const;
-    void setWakeupTick(const uint64_t value);
-    void setLastInstructionCycle(uint64_t cycle) {
+    void setWakeupTick(uint64_t value);
+    void setLastInstructionCycle(const uint64_t cycle) {
         lastInstructionCycle = cycle;
     }
     uint64_t getLastInstructionCycle() const {
