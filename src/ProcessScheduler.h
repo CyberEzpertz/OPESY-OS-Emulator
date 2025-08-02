@@ -63,6 +63,7 @@ private:
     int numCpuCores;
     std::atomic<int> availableCores;
     std::vector<std::shared_ptr<Process>> coreAssignments;
+    mutable std::mutex coreAssignmentsMutex;
 
     std::deque<std::shared_ptr<Process>> readyQueue;
     std::mutex readyMutex;

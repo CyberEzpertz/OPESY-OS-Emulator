@@ -5,6 +5,7 @@
 #include "Process.h"
 
 #include <chrono>
+#include <cmath>
 #include <ctime>
 #include <filesystem>
 #include <fstream>
@@ -18,8 +19,7 @@
 #include "PagingAllocator.h"
 
 // If INSTRUCTION_SIZE is 0, we assume it doesn't count toward paging
-constexpr int INSTRUCTION_SIZE = 0;
-
+constexpr int INSTRUCTION_SIZE = 2;
 constexpr int MAX_VARIABLES = 32;
 constexpr int VARIABLE_SIZE = 2;
 
@@ -28,6 +28,7 @@ Process::Process(const int id, const std::string& name, const uint64_t requiredM
     : processID(id),
       processName(name),
       currentLine(0),
+      totalLines(0),
       requiredMemory(requiredMemory),
       currentInstructionIndex(0),
       status(READY),
@@ -35,11 +36,6 @@ Process::Process(const int id, const std::string& name, const uint64_t requiredM
       variables({}),
       wakeupTick(0),
       maxHeapMemory(0) {
-    totalLines = 0;
-    for (const auto& instr : instructions) {
-        totalLines += instr->getLineCount();
-    }
-
     timestamp = generateTimestamp();
 }
 
@@ -110,12 +106,11 @@ void Process::log(const std::string& entry) {
 void Process::incrementLine() {
     std::lock_guard lock(instructionsMutex);
     if (currentLine < totalLines) {
-        // [IMPORTANT] This commented code is if instructions are used in paging, uncomment if needed
-        // const int instructionPage = (currentLine * INSTRUCTION_SIZE) / Config::getInstance().getMemPerFrame();
-        //
-        // if (!pageTable[instructionPage].isValid) {
-        //     PagingAllocator::getInstance().handlePageFault(this->processID, instructionPage);
-        // }
+        // [IMPORTANT] This code below is if instructions are used in paging, comment if needed
+        const int instructionPage = (currentLine * INSTRUCTION_SIZE) / Config::getInstance().getMemPerFrame();
+        if (!pageTable[instructionPage].isValid) {
+            PagingAllocator::getInstance().handlePageFault(this->processID, instructionPage);
+        }
 
         instructions[currentInstructionIndex]->execute();
 
@@ -145,36 +140,44 @@ void Process::setCurrentCore(const int coreId) {
 int Process::getCurrentCore() const {
     return currentCore.load();
 }
-void Process::setInstructions(const std::vector<std::shared_ptr<Instruction>>& instructions) {
+void Process::setInstructions(const std::vector<std::shared_ptr<Instruction>>& instructions, const bool addToMemory) {
     std::lock_guard lock(instructionsMutex);
+
+    // Set instruction-related props
     this->instructions = instructions;
     this->totalLines = 0;
-
     for (const auto& instr : instructions) {
         this->totalLines += instr->getLineCount();
     }
 
-    const int pageSize = static_cast<int>(Config::getInstance().getMemPerFrame());
+    // In the case that instructions are not counted in initial required memory
+    // We can set this flag to be true
+    if (addToMemory) {
+        requiredMemory += totalLines * INSTRUCTION_SIZE;
+    }
 
-    const size_t numPages = requiredMemory / pageSize;
+    // Initialize pageTable
+    const int pageSize = static_cast<int>(Config::getInstance().getMemPerFrame());
+    const size_t numPages = std::ceil(static_cast<double>(requiredMemory) / pageSize);
     pageTable.resize(numPages);
 
-    // Calculate where the heap begins
-
+    // Calculate symbol table segment (which should be after instructions)
     const int symbolTableStartByte = totalLines * INSTRUCTION_SIZE;
     const int symbolTableEndByte = symbolTableStartByte + MAX_VARIABLES * 2;
 
     const int symbolStartPage = symbolTableStartByte / pageSize;
     const int symbolEndPage = (symbolTableEndByte - 1) / pageSize;  // inclusive
 
-    // Populate symbolTablePages set
+    // Insert the pages required for symbol table inside the set
     for (int page = symbolStartPage; page <= symbolEndPage; ++page) {
         symbolTablePages.insert(page);
     }
 
+    // Calculate the heap segment
     heapStartPage = symbolTableEndByte / pageSize;
     heapStartOffset = symbolTableEndByte % pageSize;
 
+    // Calculate how many bytes are allocated for heap segment
     const int heapBytes = numPages * pageSize - (heapStartPage * pageSize + heapStartOffset);
     heapMemory.resize(heapBytes);
 }
@@ -182,6 +185,7 @@ void Process::setInstructions(const std::vector<std::shared_ptr<Instruction>>& i
 bool Process::setVariable(const std::string& name, const uint16_t value) {
     std::lock_guard lock(scopeMutex);
 
+    // Check if entire symbol table is loaded
     for (const int page : symbolTablePages) {
         if (!pageTable[page].isValid) {
             PagingAllocator::getInstance().handlePageFault(processID, page);
@@ -276,18 +280,45 @@ void Process::swapPageIn(const int pageNumber, const int frameNumber) {
     pageTable[pageNumber].frameNumber = frameNumber;
 }
 
+void Process::shutdown(int invalidAddress) {
+    didShutdown = true;
+    shutdownDetails =
+        std::format("Process {} shut down due to memory access violation error that occurred at {}. {:x} invalid.",
+                    processName, getTimestamp(), invalidAddress);
+    status = DONE;
+}
+
+// Converts the virtual memory address into the heap index
+int Process::convertAddressToHeapIdx(const int address) const {
+    const auto pageSize = Config::getInstance().getMemPerFrame();
+    const int heapAddressStart = heapStartPage * pageSize + heapStartOffset;
+
+    // Align it so that it doesn't break
+    if (address % 2 == 1) {
+        return (address - 1) - heapAddressStart;
+    }
+
+    return address - heapAddressStart;
+}
+
+// Checks if the given address is inside the heap
+bool Process::isValidHeapAddress(const int address) const {
+    const auto pageSize = Config::getInstance().getMemPerFrame();
+    const int heapAddressStart = heapStartPage * pageSize + heapStartOffset;
+
+    return address > heapAddressStart && address < requiredMemory;
+}
+
+// Writes to given address if possible, shuts down if not
 void Process::writeToHeap(const int address, const uint16_t value) {
     const auto pageSize = Config::getInstance().getMemPerFrame();
     const int totalOffset = heapStartOffset + address;
     const int pageNumber = heapStartPage + (totalOffset / pageSize);
 
-    if (address < 0 || address + 1 >= heapMemory.size() || address % 2 == 1) {
-        didShutdown = true;
-        shutdownDetails =
-            std::format("Process {} shut down due to memory access violation error that occurred at {}. {:x} invalid.",
-                        processName, getTimestamp(), address);
-        status = DONE;
-
+    // Invalid memory access criteria:
+    // 1. Address is outside of heap bounds
+    if (isValidHeapAddress(address)) {
+        shutdown(address);
         return;
     }
 
@@ -295,29 +326,35 @@ void Process::writeToHeap(const int address, const uint16_t value) {
         PagingAllocator::getInstance().handlePageFault(processID, pageNumber);
     }
 
-    heapMemory[address] = value & 0xFF;             // lower byte
-    heapMemory[address + 1] = (value >> 8) & 0xFF;  // upper byte
+    // Convert raw virtual memory address into index
+    const auto heapIndex = convertAddressToHeapIdx(address);
+
+    heapMemory[heapIndex] = value & 0xFF;             // lower byte
+    heapMemory[heapIndex + 1] = (value >> 8) & 0xFF;  // upper byte
 }
 
+// Reads the given address if possible, shuts down if not
 uint16_t Process::readFromHeap(const int address) {
-    const int pageSize = Config::getInstance().getMemPerFrame();
+    const auto pageSize = Config::getInstance().getMemPerFrame();
     const int totalOffset = heapStartOffset + address;
     const int pageNumber = heapStartPage + (totalOffset / pageSize);
 
-    if (address < 0 || address + 1 >= heapMemory.size() || address % 2 == 1) {
-        didShutdown = true;
-        shutdownDetails =
-            std::format("Process {} shut down due to memory access violation error that occurred at {}. {:x} invalid.",
-                        processName, getTimestamp(), address);
-        status = DONE;
+    // Invalid memory access criteria:
+    // 1. Address is outside of heap bounds
+    // 2. Address is inside, but it's an odd number
+    if (isValidHeapAddress(address)) {
+        shutdown(address);
+        return 0;
     }
 
     if (!pageTable[pageNumber].isValid) {
         PagingAllocator::getInstance().handlePageFault(processID, pageNumber);
     }
 
+    const auto heapIndex = convertAddressToHeapIdx(address);
+
     // Combine the two halves here
-    return heapMemory[address] | (heapMemory[address + 1] << 8);
+    return heapMemory[heapIndex] | (heapMemory[heapIndex + 1] << 8);
 }
 
 /**

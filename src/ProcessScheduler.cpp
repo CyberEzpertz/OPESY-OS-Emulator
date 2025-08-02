@@ -74,6 +74,8 @@ uint64_t ProcessScheduler::getActiveCPUTicks() const {
 }
 
 std::vector<std::shared_ptr<Process>> ProcessScheduler::getCoreAssignments() const {
+    std::lock_guard lock(coreAssignmentsMutex);
+
     return coreAssignments;
 }
 
@@ -239,6 +241,7 @@ void ProcessScheduler::executeRR(const std::shared_ptr<Process>& proc, uint64_t&
 }
 
 void ProcessScheduler::resetCore(std::shared_ptr<Process>& proc, int coreId) {
+    std::lock_guard lock(coreAssignmentsMutex);
     // Check if process is finished
     if (proc->getIsFinished()) {
         proc->setStatus(DONE);
@@ -271,9 +274,11 @@ void ProcessScheduler::workerLoop(const int coreId) {
 
                 proc->setStatus(RUNNING);
                 proc->setCurrentCore(coreId);
-                availableCores -= 1;
-
-                coreAssignments[coreId] = proc;
+                {
+                    std::lock_guard lock2(coreAssignmentsMutex);
+                    availableCores -= 1;
+                    coreAssignments[coreId] = proc;
+                }
             }
         }
 

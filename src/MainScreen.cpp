@@ -383,11 +383,47 @@ void MainScreen::generateProcessSMI() {
     std::println("Running processes and memory usage:");
     std::println("{}", std::string(header.length(), '-'));
 
-    for (auto process : coreAssignments) {
+    int i = 0;
+    // Prevents printing the same process twice.
+    // A process that enters WAITING may still appear in a core until the next tick,
+    // so it's treated as both waiting and assigned briefly.
+    std::set<int> seenProcessIds;
+
+    for (const auto& process : coreAssignments) {
         if (process == nullptr)
             continue;
-        std::println("{}\t {}", process->getName(), process->getMemoryUsage());
+        std::println("Core {}:\t {}\t {}B\t {}", i, process->getName(), process->getMemoryUsage(),
+                     process->getStatus() == RUNNING ? "RUNNING" : "OTHER");
+
+        seenProcessIds.insert(process->getID());
+        ++i;
     }
+
+    std::println("{}", std::string(header.length(), '-'));
+    std::println("Ready/Waiting processes with memory usage:");
+    std::println("{}", std::string(header.length(), '-'));
+
+    for (const auto& process : ConsoleManager::getInstance().getProcessIdList()) {
+        if (!process || seenProcessIds.contains(process->getID())) {
+            continue;
+        }
+
+        const auto status = process->getStatus();
+        if ((status != WAITING && status != READY) || process->getMemoryUsage() <= 0) {
+            continue;
+        }
+
+        std::string statusString = "";
+        if (status == WAITING) {
+            statusString = "WAITING";
+        } else {
+            statusString = "READY";
+        }
+
+        std::println("{}\t {}\t {}B", statusString, process->getName(), process->getMemoryUsage());
+        ++i;
+    }
+
     std::println("{}", std::string(header.length(), '-'));
 }
 
