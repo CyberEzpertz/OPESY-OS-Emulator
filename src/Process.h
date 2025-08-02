@@ -115,6 +115,7 @@ public:
 
     void swapPageOut(int pageNumber);
     void swapPageIn(int pageNumber, int frameNumber);
+    void shutdown(int invalidAddress);
 
     void writeToHeap(int address, uint16_t value);
     uint16_t readFromHeap(int address);
@@ -147,6 +148,9 @@ private:
     size_t maxHeapMemory;
     int heapStartPage = 0;
     int heapStartOffset = 0;
+
+    int convertAddressToHeapIdx(int address) const;
+    bool isValidHeapAddress(int address) const;
 
     bool didShutdown = false;
     std::string shutdownDetails;
