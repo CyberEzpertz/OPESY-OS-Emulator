@@ -34,6 +34,10 @@ add_executable(os_emulator src/main.cpp
         src/FlatMemoryAllocator.h
         src/PagingAllocator.cpp
         src/PagingAllocator.h
+        src/WriteInstruction.cpp
+        src/WriteInstruction.h
+        src/ReadInstruction.cpp
+        src/ReadInstruction.h
 )
 
 set_property(TARGET os_emulator PROPERTY CXX_STANDARD 23)

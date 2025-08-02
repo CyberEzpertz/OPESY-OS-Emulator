@@ -10,6 +10,7 @@
 
 class InstructionFactory {
 public:
+    static uint64_t calculateProcessMemoryRequirement(int numInstructions);
     static std::vector<std::shared_ptr<Instruction>> generateInstructions(int pid, const std::string& processName);
     static std::mt19937 rng;
     static int generateRandomNum(int min, int max);
