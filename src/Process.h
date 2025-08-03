@@ -81,6 +81,7 @@ public:
      * @param entry The log entry to add.
      */
     void log(const std::string& entry);
+    void safePageFault(int page) const;
 
     /**
      * @brief Increments the current line number by 1, up to the total number of
@@ -157,6 +158,7 @@ private:
     static std::pair<int, int> splitAddress(int address);
 
     std::vector<PageEntry> pageTable;
+    mutable std::mutex pageTableMutex;
     std::vector<PageData> precomputedPages;
 
     bool isValidHeapAddress(int address) const;

@@ -100,24 +100,41 @@ void Process::log(const std::string& entry) {
     logs.push_back(entry);
 }
 
+void Process::safePageFault(const int page) const {
+    PagingAllocator& allocator = PagingAllocator::getInstance();
+    if (!pageTable[page].isValid || !allocator.pinFrame(pageTable[page].frameNumber, processID, page)) {
+        allocator.handlePageFault(this->processID, page);
+    }
+}
+
 /**
  * @brief Increments the current line number, up to the total number of lines.
  */
 void Process::incrementLine() {
     std::lock_guard lock(instructionsMutex);
     if (currentLine < totalLines) {
-        // [IMPORTANT] This code below is if instructions are used in paging, comment if needed
-        const int instructionPage = (currentLine * INSTRUCTION_SIZE) / Config::getInstance().getMemPerFrame();
-        if (!pageTable[instructionPage].isValid) {
-            PagingAllocator::getInstance().handlePageFault(this->processID, instructionPage);
+        const int instrAddress = (currentInstructionIndex * INSTRUCTION_SIZE);
+        const auto [page, offset] = splitAddress(instrAddress);
+        safePageFault(page);
+
+        {
+            // std::lock_guard pageLock(pageTableMutex);
+            auto frameNumber = pageTable[page].frameNumber;
+
+            const auto instr = PagingAllocator::getInstance().readFromFrame(frameNumber, offset);
+
+            if (!std::holds_alternative<std::shared_ptr<Instruction>>(instr)) {
+                throw std::runtime_error(std::format("Frame {} Offset {} is not an instruction.", frameNumber, offset));
+            }
+
+            const auto parsedInstr = std::get<std::shared_ptr<Instruction>>(instr);
+            parsedInstr->execute();
+
+            currentLine++;
+
+            if (parsedInstr->isComplete())
+                currentInstructionIndex++;
         }
-
-        instructions[currentInstructionIndex]->execute();
-
-        currentLine++;
-
-        if (instructions[currentInstructionIndex]->isComplete())
-            currentInstructionIndex++;
     }
 
     if (currentLine >= totalLines) {
@@ -179,10 +196,7 @@ bool Process::setVariable(const std::string& name, const uint16_t value) {
     const auto address = variableAddresses[name];
     const auto [page, offset] = splitAddress(address);
 
-    // Ensure the page is valid (handle page fault if needed)
-    if (!pageTable[page].isValid) {
-        PagingAllocator::getInstance().handlePageFault(processID, page);
-    }
+    safePageFault(page);
 
     const auto frame = pageTable[page].frameNumber;
     PagingAllocator::getInstance().writeToFrame(frame, offset, value);
@@ -197,15 +211,10 @@ uint16_t Process::getVariable(const std::string& name) {
     if (variableAddresses.contains(name)) {
         const auto [page, offset] = splitAddress(variableAddresses[name]);
 
-        if (!pageTable[page].isValid) {
-            PagingAllocator::getInstance().handlePageFault(processID, page);
-        }
+        safePageFault(page);
 
-        if (!pageTable[page].isValid) {
-            throw std::runtime_error("Page faulted, but still didn't find a valid page");
-        }
-
-        const auto data = PagingAllocator::getInstance().readFromFrame(pageTable[page].frameNumber, offset);
+        const auto frameNumber = pageTable[page].frameNumber;
+        const auto data = PagingAllocator::getInstance().readFromFrame(frameNumber, offset);
 
         if (std::holds_alternative<uint16_t>(data))
             return std::get<uint16_t>(data);
@@ -270,9 +279,7 @@ bool Process::declareVariable(const std::string& name, uint16_t value) {
     const auto [page, offset] = splitAddress(nextAddress);
 
     // Ensure page is loaded
-    if (!pageTable[page].isValid) {
-        PagingAllocator::getInstance().handlePageFault(processID, page);
-    }
+    safePageFault(page);
 
     // Write initial value
     const auto frame = pageTable[page].frameNumber;
@@ -300,12 +307,14 @@ PageEntry Process::getPageEntry(const int pageNumber) const {
 }
 
 void Process::swapPageOut(const int pageNumber) {
+    std::lock_guard lock(pageTableMutex);
     pageTable[pageNumber].isValid = false;
     pageTable[pageNumber].inBackingStore = true;
     pageTable[pageNumber].frameNumber = -1;
 }
 
 void Process::swapPageIn(const int pageNumber, const int frameNumber) {
+    std::lock_guard lock(pageTableMutex);
     pageTable[pageNumber].isValid = true;
     pageTable[pageNumber].inBackingStore = false;
     pageTable[pageNumber].frameNumber = frameNumber;
@@ -351,11 +360,11 @@ void Process::writeToHeap(const int address, const uint16_t value) {
     }
 
     // Ensure the page is loaded
-    if (!pageTable[page].isValid) {
-        PagingAllocator::getInstance().handlePageFault(processID, page);
-    }
+    safePageFault(page);
 
-    PagingAllocator::getInstance().writeToFrame(pageTable[page].frameNumber, offset, value);
+    const auto frameNumber = pageTable[page].frameNumber;
+
+    PagingAllocator::getInstance().writeToFrame(frameNumber, offset, value);
 }
 
 PageData Process::getPageData(const int pageNumber) const {
@@ -382,6 +391,7 @@ PageData Process::getPageData(const int pageNumber) const {
 
 // Reads the given address if possible, shuts down if not
 uint16_t Process::readFromHeap(const int address) {
+    std::lock_guard lock(heapMutex);
     // Invalid memory access criteria:
     // 1. Address is outside of heap bounds
     if (!isValidHeapAddress(address)) {
@@ -397,11 +407,11 @@ uint16_t Process::readFromHeap(const int address) {
     }
 
     // Ensure page is loaded
-    if (!pageTable[page].isValid) {
-        PagingAllocator::getInstance().handlePageFault(processID, page);
-    }
+    safePageFault(page);
 
-    const auto data = PagingAllocator::getInstance().readFromFrame(pageTable[page].frameNumber, offset);
+    const auto frameNumber = pageTable[page].frameNumber;
+
+    const auto data = PagingAllocator::getInstance().readFromFrame(frameNumber, offset);
 
     if (std::holds_alternative<uint16_t>(data))
         return std::get<uint16_t>(data);
@@ -458,7 +468,7 @@ std::string Process::generateTimestamp() {
 }
 
 std::uint64_t Process::getMemoryUsage() const {
-    std::lock_guard lock(variableMutex);
+    // std::lock_guard lock(variableMutex);
     uint64_t memoryUsage = 0;
     const auto pageSize = Config::getInstance().getMemPerFrame();
 
