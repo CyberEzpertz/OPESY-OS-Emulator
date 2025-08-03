@@ -378,3 +378,182 @@ std::shared_ptr<Instruction> InstructionFactory::deserializeInstruction(std::ist
 
     throw std::runtime_error("Unknown instruction type: " + type);
 }
+
+std::vector<std::shared_ptr<Instruction>> InstructionFactory::createInstructionsFromStrings(
+    const std::vector<std::string>& instructionStrings, int processID) {
+
+    std::vector<std::shared_ptr<Instruction>> instructions;
+    instructions.reserve(instructionStrings.size());
+
+    for (const std::string& instrStr : instructionStrings) {
+        try {
+            auto instruction = parseInstructionString(instrStr, processID);
+            instructions.push_back(instruction);
+        } catch (const std::exception& e) {
+            // Re-throw with more context about which instruction failed
+            throw std::runtime_error("Failed to parse instruction '" + instrStr + "': " + e.what());
+        }
+    }
+
+    return instructions;
+}
+
+std::shared_ptr<Instruction> InstructionFactory::parseInstructionString(
+    const std::string& instrStr, int processID) {
+
+    std::istringstream iss(instrStr);
+    std::string command;
+    iss >> command;
+
+    // Convert to uppercase for case-insensitive comparison
+    std::transform(command.begin(), command.end(), command.begin(), ::toupper);
+
+    if (command == "PRINT") {
+        // Format options:
+        // PRINT "message"
+        // PRINT variable "message"
+
+        std::string remaining;
+        std::getline(iss, remaining);
+
+        // Trim leading whitespace
+        remaining.erase(remaining.begin(), std::find_if(remaining.begin(), remaining.end(),
+                                                        [](unsigned char ch) { return !std::isspace(ch); }));
+
+        if (remaining.empty()) {
+            throw std::runtime_error("PRINT instruction requires a message or variable");
+        }
+
+        // Check if it starts with a quote (simple message)
+        if (remaining.front() == '"') {
+            // Extract quoted message
+            size_t endQuote = remaining.find('"', 1);
+            if (endQuote == std::string::npos) {
+                throw std::runtime_error("Unterminated quote in PRINT instruction");
+            }
+            std::string message = remaining.substr(1, endQuote - 1);
+            return std::make_shared<PrintInstruction>(message, processID);
+        }
+        // Look for variable followed by quoted message
+        std::istringstream remainingStream(remaining);
+        std::string variable, quotedMessage;
+        remainingStream >> variable;
+
+        std::getline(remainingStream, quotedMessage);
+        quotedMessage.erase(quotedMessage.begin(), std::find_if(quotedMessage.begin(), quotedMessage.end(),
+                                                                [](unsigned char ch) { return !std::isspace(ch); }));
+
+        if (quotedMessage.empty() || quotedMessage.front() != '"') {
+            // Just a variable name print
+            return std::make_shared<PrintInstruction>("", processID, variable);
+        } else {
+            // Variable and message
+            size_t endQuote = quotedMessage.find('"', 1);
+            if (endQuote == std::string::npos) {
+                throw std::runtime_error("Unterminated quote in PRINT instruction");
+            }
+            std::string message = quotedMessage.substr(1, endQuote - 1);
+            return std::make_shared<PrintInstruction>(message, processID, variable);
+        }
+    }
+    if (command == "DECLARE") {
+        // Format: DECLARE variable value
+        std::string variable;
+        uint16_t value;
+        iss >> variable >> value;
+
+        if (variable.empty() || iss.fail()) {
+            throw std::runtime_error("DECLARE instruction requires variable name and value");
+        }
+
+        return std::make_shared<DeclareInstruction>(variable, value, processID);
+    }
+    if (command == "SLEEP") {
+        // Format: SLEEP duration
+        int duration;
+        iss >> duration;
+
+        if (iss.fail()) {
+            throw std::runtime_error("SLEEP instruction requires duration");
+        }
+
+        return std::make_shared<SleepInstruction>(duration, processID);
+    }
+    if (command == "ADD" || command == "SUB" || command == "MUL" || command == "DIV") {
+        // Format: ADD result lhs rhs
+        std::string resultName, lhsStr, rhsStr;
+        iss >> resultName >> lhsStr >> rhsStr;
+
+        if (resultName.empty() || lhsStr.empty() || rhsStr.empty()) {
+            throw std::runtime_error(command + " instruction requires result, lhs, and rhs operands");
+        }
+
+        auto parseOperand = [](const std::string& token) -> Operand {
+            try {
+                // Try to parse as uint16_t
+                return static_cast<uint16_t>(std::stoul(token));
+            } catch (...) {
+                // Otherwise treat as string (variable name)
+                return token;
+            }
+        };
+
+        Operand lhs = parseOperand(lhsStr);
+        Operand rhs = parseOperand(rhsStr);
+
+        Operation op;
+        if (command == "ADD")
+            op = Operation::ADD;
+        else if (command == "SUB")
+            op = Operation::SUBTRACT;
+
+        return std::make_shared<ArithmeticInstruction>(resultName, lhs, rhs, op, processID);
+    }
+    if (command == "WRITE") {
+        // Format: WRITE address value
+        int addr;
+        uint16_t value;
+        iss >> addr >> value;
+
+        if (iss.fail()) {
+            throw std::runtime_error("WRITE instruction requires address and value");
+        }
+
+        return std::make_shared<WriteInstruction>(addr, value, processID);
+    }
+    if (command == "READ") {
+        // Format: READ variable address
+        std::string variable;
+        int addr;
+        iss >> variable >> addr;
+
+        if (variable.empty() || iss.fail()) {
+            throw std::runtime_error("READ instruction requires variable name and address");
+        }
+
+        return std::make_shared<ReadInstruction>(variable, addr, processID);
+    } else if (command == "FOR") {
+        // FOR loops are complex and typically not single-line
+        // This is a simplified version - you might want to handle this differently
+        throw std::runtime_error("FOR loops are not supported in single-line instruction format. Use separate "
+                                 "instruction files for complex control structures.");
+    } else {
+        throw std::runtime_error("Unknown instruction: " + command);
+    }
+}
+
+// Note: You'll need to add this method declaration to your InstructionFactory.h:
+// static std::shared_ptr<Instruction> parseInstructionString(const std::string& instrStr, int processID);
+
+// Example usage patterns for the instruction parser:
+//
+// PRINT "Hello World"                    -> PrintInstruction("Hello World", pid)
+// PRINT var "Value is: "                 -> PrintInstruction("Value is: ", pid, "var")
+// DECLARE x 10                           -> DeclareInstruction("x", 10, pid)
+// SLEEP 1000                             -> SleepInstruction(1000, pid)
+// ADD result 5 10                        -> ArithmeticInstruction("result", 5, 10, ADD, pid)
+// SUB result var1 var2                   -> ArithmeticInstruction("result", "var1", "var2", SUB, pid)
+// MUL result var1 5                      -> ArithmeticInstruction("result", "var1", 5, MUL, pid)
+// DIV result 20 var2                     -> ArithmeticInstruction("result", 20, "var2", DIV, pid)
+// WRITE 100 255                          -> WriteInstruction(100, 255, pid)
+// READ var 100                           -> ReadInstruction("var", 100, pid)

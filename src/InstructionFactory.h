@@ -18,6 +18,10 @@ public:
     static std::vector<std::shared_ptr<Instruction>> createAlternatingPrintAdd(int pid);
     static std::shared_ptr<Instruction> deserializeInstruction(std::istream& is);
 
+    static std::shared_ptr<Instruction> parseInstructionString(const std::string& instrStr, int processID);
+    static std::vector<std::shared_ptr<Instruction>> createInstructionsFromStrings(
+    const std::vector<std::string>& instructionStrings, int processID);
+
 private:
     static std::shared_ptr<Instruction> createRandomInstruction(int pid, const std::string& processName,
                                                                 std::set<std::string>& declaredVars,

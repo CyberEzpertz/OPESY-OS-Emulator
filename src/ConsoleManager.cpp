@@ -1,6 +1,9 @@
 #include "ConsoleManager.h"
 
 #include <print>
+#include <sstream>
+#include <algorithm>
+#include <cmath>
 
 #include "InstructionFactory.h"
 #include "MainScreen.h"
@@ -8,6 +11,14 @@
 #include "Process.h"
 #include "ProcessScheduler.h"
 #include "ProcessScreen.h"
+
+// Constants for memory validation
+constexpr int MIN_MEMORY_SIZE = 64;
+constexpr int MAX_MEMORY_SIZE = 65536;
+constexpr int INSTRUCTION_SIZE = 2;  // bytes
+constexpr int SYMBOL_TABLE_SIZE = 64;  // bytes
+constexpr int MIN_INSTRUCTIONS = 1;
+constexpr int MAX_INSTRUCTIONS = 50;
 
 /// Initializes the console manager with the main screen and renders it.
 void ConsoleManager::initialize() {
@@ -50,6 +61,124 @@ void ConsoleManager::switchConsole(const std::string& processName) {
     } else {
         std::println("Error: No process named {} was found.", processName);
     }
+}
+
+/// Helper function to check if a number is a power of 2
+bool ConsoleManager::isPowerOfTwo(int n) const {
+    return n > 0 && (n & (n - 1)) == 0;
+}
+
+/// Validates memory size according to requirements
+bool ConsoleManager::validateMemorySize(int memSize) const {
+    if (memSize < MIN_MEMORY_SIZE || memSize > MAX_MEMORY_SIZE) {
+        return false;
+    }
+    return isPowerOfTwo(memSize);
+}
+
+/// Parses instruction string separated by semicolons
+std::vector<std::string> ConsoleManager::parseInstructions(const std::string& instrStr) const {
+    std::vector<std::string> instructions;
+    std::stringstream ss(instrStr);
+    std::string instruction;
+
+    while (std::getline(ss, instruction, ';')) {
+        // Trim whitespace
+        instruction.erase(instruction.begin(),
+            std::find_if(instruction.begin(), instruction.end(),
+                [](unsigned char ch) { return !std::isspace(ch); }));
+        instruction.erase(
+            std::find_if(instruction.rbegin(), instruction.rend(),
+                [](unsigned char ch) { return !std::isspace(ch); }).base(),
+            instruction.end());
+
+        if (!instruction.empty()) {
+            instructions.push_back(instruction);
+        }
+    }
+
+    return instructions;
+}
+
+/// Validates if instructions fit within memory constraints
+bool ConsoleManager::validateInstructionsFitMemory(const std::vector<std::string>& instructions, int memSize) const {
+    if (instructions.size() < MIN_INSTRUCTIONS || instructions.size() > MAX_INSTRUCTIONS) {
+        return false;
+    }
+
+    int requiredMemory = (instructions.size() * INSTRUCTION_SIZE) + SYMBOL_TABLE_SIZE;
+    return requiredMemory <= memSize;
+}
+
+/// Creates a process with custom instructions and memory size
+bool ConsoleManager::createProcessWithCustomInstructions(const std::string& processName,
+                                                        int memSize,
+                                                        const std::string& instrStr) {
+    // Check if process name already exists
+    if (processNameMap.contains(processName)) {
+        std::println("Error: Process '{}' already exists.", processName);
+        return false;
+    }
+
+    // Validate memory size
+    if (!validateMemorySize(memSize)) {
+        std::println("Invalid memory allocation. Value must be a power of 2 between 64 and 65536.");
+        return false;
+    }
+
+    // Parse instructions
+    std::vector<std::string> instructionStrings = parseInstructions(instrStr);
+
+    if (instructionStrings.empty()) {
+        std::println("Error: No valid instructions provided.");
+        return false;
+    }
+
+    // Validate instruction count and memory fit
+    if (!validateInstructionsFitMemory(instructionStrings, memSize)) {
+        if (instructionStrings.size() < MIN_INSTRUCTIONS || instructionStrings.size() > MAX_INSTRUCTIONS) {
+            std::println("Error: Number of instructions must be between {} and {}.",
+                        MIN_INSTRUCTIONS, MAX_INSTRUCTIONS);
+        } else {
+            int requiredMemory = (instructionStrings.size() * INSTRUCTION_SIZE) + SYMBOL_TABLE_SIZE;
+            std::println("Error: Instructions require {} bytes but only {} bytes available.",
+                        requiredMemory, memSize);
+        }
+        return false;
+    }
+
+    // Create the process
+    std::unique_lock lock(processListMutex);
+    const int PID = processIDList.size();
+
+    // Create process with the specified memory size
+    // Note: We don't add instruction size here since setInstructions will handle it
+    const auto newProcess = std::make_shared<Process>(PID, processName, memSize);
+    processNameMap[processName] = newProcess;
+    processIDList.push_back(newProcess);
+
+    // Convert instruction strings to actual instruction objects
+    // This assumes InstructionFactory has a method to create instructions from strings
+    std::vector<std::shared_ptr<Instruction>> instructions;
+    try {
+        instructions = InstructionFactory::createInstructionsFromStrings(instructionStrings, PID);
+    } catch (const std::exception& e) {
+        // If instruction creation fails, remove the process and return false
+        processNameMap.erase(processName);
+        processIDList.pop_back();
+        std::println("Error: Failed to create instructions: {}", e.what());
+        return false;
+    }
+
+    // Set instructions with addToMemory=false since we already allocated the exact memory size
+    // The user-specified memSize already accounts for instructions + symbol table + data
+    newProcess->setInstructions(instructions, false);
+    ProcessScheduler::getInstance().scheduleProcess(newProcess);
+
+    std::println("Process '{}' created successfully with {} instructions and {} bytes of memory.",
+                processName, instructions.size(), memSize);
+
+    return true;
 }
 
 /// Creates and registers a process using its name for future switching.
@@ -133,9 +262,11 @@ void ConsoleManager::getUserInput() const {
 void ConsoleManager::exitProgram() {
     hasExited = true;
 }
+
 bool ConsoleManager::getHasInitialized() const {
     return hasInitialized;
 }
+
 std::unordered_map<std::string, std::shared_ptr<Process>> ConsoleManager::getProcessNameMap() {
     std::shared_lock lock(processListMutex);
     return processNameMap;

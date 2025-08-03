@@ -66,6 +66,11 @@ public:
 
     void returnToMainScreen();
 
+    /// @return true if process creation was successful, false otherwise
+    bool createProcessWithCustomInstructions(const std::string& processName,
+                                            int memSize,
+                                            const std::string& instrStr);
+
 private:
     /// @brief Flag to indicate if the program should exit.
     bool hasExited = false;
@@ -92,4 +97,12 @@ private:
     std::vector<std::shared_ptr<Process>> processIDList;
 
     std::shared_mutex processListMutex;
+
+    bool isPowerOfTwo(int n) const;
+
+    bool validateMemorySize(int memSize) const;
+
+    std::vector<std::string> parseInstructions(const std::string& instrStr) const;
+
+    bool validateInstructionsFitMemory(const std::vector<std::string>& instructions, int memSize) const;
 };
