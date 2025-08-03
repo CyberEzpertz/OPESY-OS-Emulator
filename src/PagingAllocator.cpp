@@ -5,10 +5,15 @@
 #include "PagingAllocator.h"
 
 #include <fstream>
+#include <iosfwd>
+#include <optional>
 #include <print>
+#include <variant>
+#include <vector>
 
 #include "Config.h"
 #include "ConsoleManager.h"
+#include "InstructionFactory.h"
 #include "Process.h"
 
 static constexpr auto BACKING_STORE_FILE = "csopesy-backing-store.txt";
@@ -18,36 +23,45 @@ PagingAllocator& PagingAllocator::getInstance() {
     return *instance;
 }
 
-void PagingAllocator::handlePageFault(const int pid, const int pageNumber) {
+PageFaultResult PagingAllocator::handlePageFault(const int pid, const int pageNumber) {
+    std::vector<std::optional<StoredData>> pageData;
+    // Can be used if there's a limit on page faults
+    constexpr int maxAttempts = 10;
+    int attempts = 0;
+
     const auto process = ConsoleManager::getInstance().getProcessByPID(pid);
 
-    std::lock_guard lock(pagingMutex);
-
-    const PageEntry entry = process->getPageEntry(pageNumber);
-
-    // If the entry was swapped out, this will trigger
-    if (entry.inBackingStore) {
-        swapIn(pid, pageNumber);
+    // Load page data BEFORE retry loop (only once!)
+    {
+        std::lock_guard lock(pagingMutex);
+        const PageEntry entry = process->getPageEntry(pageNumber);
+        pageData = entry.inBackingStore ? swapIn(pid, pageNumber) : process->getPageData(pageNumber);
     }
 
-    int frameIndex = allocateFrame(pid, pageNumber);
+    while (true) {
+        {
+            std::lock_guard lock(pagingMutex);
 
-    // If the allocation was unsuccessful, evict a frame then allocate it again
-    if (frameIndex == -1) {
-        // Will free up a frame and put it in the free frame list
-        evictVictimFrame();
+            int frameIndex = allocateFrame(pid, pageNumber, pageData);
 
-        // This should now succeed since we evicted a frame
-        frameIndex = allocateFrame(pid, pageNumber);
+            if (frameIndex != -1) {
+                process->swapPageIn(pageNumber, frameIndex);
+                this->numPagedIn += 1;
+                return SUCCESS;
+            }
 
-        if (frameIndex == -1) {
-            throw std::runtime_error("Frame eviction succeeded, but no frame was available for reallocation — possible "
-                                     "free list corruption.");
+            const bool evicted = evictVictimFrame();
+
+            if (!evicted) {
+                // No evictable frame; give other threads a chance and retry
+            }
         }
-    }
 
-    process->swapPageIn(pageNumber, frameIndex);
-    this->numPagedIn += 1;
+        // if (++attempts >= maxAttempts) {
+        //     return DEFERRED;
+        // }
+        // std::this_thread::yield();
+    }
 }
 
 void PagingAllocator::deallocate(const int pid) {
@@ -61,21 +75,34 @@ void PagingAllocator::deallocate(const int pid) {
     }
 
     // 2. Remove pages from backing store belonging to this process
-    std::string backingStoreFile = BACKING_STORE_FILE;
-
-    std::ifstream inFile(backingStoreFile);
+    std::ifstream inFile(BACKING_STORE_FILE);
     std::ofstream outFile("temp.txt");
 
     std::string line;
+    bool skipLines = false;
     while (std::getline(inFile, line)) {
         std::istringstream iss(line);
         int filePid, pageNumber;
 
+        // Check for a line indicating the start of a swapped page
         if (iss >> filePid >> pageNumber) {
-            if (filePid != pid) {
-                outFile << line << '\n';
+            if (filePid == pid) {
+                skipLines = true;
+                continue;  // Don't write this line
             }
+
+            // If we're on a new pid now, we're good
+            outFile << line << '\n';
+            skipLines = false;
+            continue;
         }
+
+        // Skip data lines associated with a pid being deallocated
+        if (skipLines) {
+            continue;
+        }
+
+        outFile << line << '\n';
     }
 
     inFile.close();
@@ -90,7 +117,7 @@ void PagingAllocator::visualizeMemory() {
     std::println("--------+------------+------------");
 
     for (size_t i = 0; i < frameTable.size(); ++i) {
-        const auto& [pid, pageNumber] = frameTable[i];
+        const auto& [pid, pageNumber, _, _pinned] = frameTable[i];
         if (pid == -1) {
             std::println("{:>6} | {:>10} | {:>10}", i, "-", "-");
         } else {
@@ -118,6 +145,59 @@ int PagingAllocator::getFreeMemory() const {
     return Config::getInstance().getMaxOverallMem() - getUsedMemory();
 }
 
+std::optional<uint16_t> PagingAllocator::readUint16FromFrame(const int frameNumber, const int offset) const {
+    const auto& data = frameTable[frameNumber].data;
+
+    if (offset + 1 >= data.size())
+        return std::nullopt;
+    if (!data[offset].has_value() || !data[offset + 1].has_value())
+        return std::nullopt;
+    const uint16_t high = std::get<uint16_t>(data[offset].value());
+    const uint16_t low = std::get<uint16_t>(data[offset + 1].value());
+
+    return static_cast<uint16_t>((high << 8) | low);
+}
+bool PagingAllocator::pinFrame(const int frameNumber, const int pid, const int pageNumber) {
+    std::lock_guard lock(pagingMutex);
+    const auto frame = frameTable[frameNumber];
+
+    if (frame.pid != pid || frame.pageNumber != pageNumber)
+        return false;
+
+    frameTable[frameNumber].isPinned = true;
+    return true;
+}
+
+StoredData PagingAllocator::readFromFrame(const int frameNumber, const int offset) {
+    std::lock_guard lock(pagingMutex);
+    const auto data = frameTable[frameNumber].data[offset];
+
+    if (data.has_value()) {
+        frameTable[frameNumber].isPinned = false;
+        if (std::holds_alternative<uint16_t>(data.value())) {
+            auto valOpt = readUint16FromFrame(frameNumber, offset);
+
+            if (valOpt) {
+                return {*valOpt};
+            }
+        }
+
+        return data.value();
+    }
+
+    throw std::runtime_error("Tried accessing 2nd byte - Possible misaligned address");
+}
+void PagingAllocator::writeToFrame(const int frameNumber, const int offset, const uint16_t data) {
+    std::lock_guard lock(pagingMutex);
+    frameTable[frameNumber].isPinned = false;
+
+    const auto highByte = static_cast<uint8_t>((data >> 8) & 0xFF);
+    const auto lowByte = static_cast<uint8_t>(data & 0xFF);
+
+    frameTable[frameNumber].data[offset] = StoredData{static_cast<uint16_t>(highByte)};
+    frameTable[frameNumber].data[offset + 1] = StoredData{static_cast<uint16_t>(lowByte)};
+}
+
 PagingAllocator::PagingAllocator() {
     const auto overallMem = Config::getInstance().getMaxOverallMem();
     const auto frameSize = Config::getInstance().getMemPerFrame();
@@ -125,7 +205,7 @@ PagingAllocator::PagingAllocator() {
     this->totalFrames = overallMem / frameSize;
     frameTable.resize(totalFrames);
 
-    for (size_t i = 0; i < totalFrames; ++i) {
+    for (int i = 0; i < totalFrames; ++i) {
         freeFrameIndices.push_back(i);
     }
 
@@ -133,7 +213,8 @@ PagingAllocator::PagingAllocator() {
     std::ofstream backingStore(BACKING_STORE_FILE, std::ios::trunc);
 }
 
-int PagingAllocator::allocateFrame(const int pid, const int pageNumber) {
+int PagingAllocator::allocateFrame(const int pid, const int pageNumber,
+                                   const std::vector<std::optional<StoredData>>& pageData) {
     if (freeFrameIndices.empty()) {
         return -1;  // Signal: no frame available
     }
@@ -141,7 +222,7 @@ int PagingAllocator::allocateFrame(const int pid, const int pageNumber) {
     const int frameIndex = freeFrameIndices.front();
     freeFrameIndices.pop_front();
 
-    frameTable[frameIndex] = {pid, pageNumber};
+    frameTable[frameIndex] = {pid, pageNumber, pageData, true};
     oldFramesQueue.push_back(frameIndex);
 
     ++allocatedFrames;
@@ -149,10 +230,14 @@ int PagingAllocator::allocateFrame(const int pid, const int pageNumber) {
     return frameIndex;
 }
 
-int PagingAllocator::evictVictimFrame() {
+bool PagingAllocator::evictVictimFrame() {
     const int victimFrame = getVictimFrame();
 
-    auto& [victimPID, victimPageNum] = frameTable[victimFrame];
+    // Means no frames were available to be replaced
+    if (victimFrame == -1)
+        return false;
+
+    auto& [victimPID, victimPageNum, _, _pinned] = frameTable[victimFrame];
 
     // Update victim's page table
     const auto victimProcess = ConsoleManager::getInstance().getProcessByPID(victimPID);
@@ -167,18 +252,23 @@ int PagingAllocator::evictVictimFrame() {
     // Write frame to backing store
     swapOut(victimFrame);
 
-    return victimFrame;
+    return true;
 }
 
 int PagingAllocator::getVictimFrame() {
-    if (oldFramesQueue.empty()) {
-        throw std::runtime_error("No frames available for replacement.");
+    const size_t oldFrames = oldFramesQueue.size();
+    for (size_t i = 0; i < oldFrames; ++i) {
+        const int victimIndex = oldFramesQueue.front();
+        oldFramesQueue.pop_front();
+
+        if (!frameTable[victimIndex].isPinned) {
+            return victimIndex;
+        }
+
+        oldFramesQueue.push_back(victimIndex);
     }
 
-    const int victimIndex = oldFramesQueue.front();
-    oldFramesQueue.pop_front();
-
-    return victimIndex;
+    return -1;
 }
 
 void PagingAllocator::freeFrame(const int frameIndex) {
@@ -196,55 +286,155 @@ void PagingAllocator::swapOut(const int frameIndex) {
         throw std::out_of_range("Invalid frame index for swapOut.");
     }
 
-    const auto& [pid, pageNumber] = frameTable[frameIndex];
-
-    // Lookup the owning process
+    const auto& [pid, pageNumber, _, _pinned] = frameTable[frameIndex];
     const auto process = ConsoleManager::getInstance().getProcessByPID(pid);
     if (!process) {
         throw std::runtime_error("Process not found during swapOut.");
     }
 
-    // Append to the backing store file
     std::ofstream backingFile(BACKING_STORE_FILE, std::ios::app);
     if (!backingFile) {
         throw std::runtime_error("Failed to open backing store for writing.");
     }
+
     backingFile << pid << " " << pageNumber << "\n";
 
-    // Update process page table
+    const auto& data = frameTable[frameIndex].data;
+    const int memSize = static_cast<int>(data.size());
+
+    int i = 0;
+    while (i + 1 < memSize) {
+        // Check for 2-byte VAL
+        if (data[i].has_value() && data[i + 1].has_value() && std::holds_alternative<uint16_t>(data[i].value()) &&
+            std::holds_alternative<uint16_t>(data[i + 1].value())) {
+            const auto high = static_cast<uint8_t>(std::get<uint16_t>(data[i].value()));
+            const auto low = static_cast<uint8_t>(std::get<uint16_t>(data[i + 1].value()));
+            const uint16_t combined = (static_cast<uint16_t>(high) << 8) | low;
+
+            int start = i;
+            int count = 1;
+            i += 2;
+
+            // Compress repeated VALs
+            while (i + 1 < memSize && data[i].has_value() && data[i + 1].has_value() &&
+                   std::holds_alternative<uint16_t>(data[i].value()) &&
+                   std::holds_alternative<uint16_t>(data[i + 1].value())) {
+                const auto nextHigh = static_cast<uint8_t>(std::get<uint16_t>(data[i].value()));
+                const auto nextLow = static_cast<uint8_t>(std::get<uint16_t>(data[i + 1].value()));
+                const uint16_t nextCombined = (static_cast<uint16_t>(nextHigh) << 8) | nextLow;
+
+                if (nextCombined == combined) {
+                    count++;
+                    i += 2;
+                } else {
+                    break;
+                }
+            }
+
+            backingFile << "VAL " << start << " " << combined;
+            if (count > 1) {
+                backingFile << " x" << count;
+            }
+            backingFile << "\n";
+        } else if (data[i].has_value() && std::holds_alternative<std::shared_ptr<Instruction>>(data[i].value())) {
+            const auto& instr = std::get<std::shared_ptr<Instruction>>(data[i].value());
+            backingFile << "INS " << i << " " << instr->serialize() << "\n";
+            ++i;
+        } else {
+            ++i;
+        }
+    }
+
     process->swapPageOut(pageNumber);
     this->numPagedOut += 1;
-
-    // Free the frame
     freeFrame(frameIndex);
 }
 
-void PagingAllocator::swapIn(const int pid, int pageNumber) const {
-    // Read the previous contents
+std::vector<std::optional<StoredData>> PagingAllocator::swapIn(int pid, int pageNumber) const {
     std::ifstream backingFile(BACKING_STORE_FILE);
-
-    // Will replace the old backing store
     std::ofstream tempFile("temp.txt");
 
+    if (!backingFile.is_open()) {
+        throw std::runtime_error("Failed to open backing store file.");
+    }
+    if (!tempFile.is_open()) {
+        throw std::runtime_error("Failed to open temporary backing store file.");
+    }
+
+    std::vector<std::optional<StoredData>> storedData(Config::getInstance().getMemPerFrame(), std::nullopt);
     std::string line;
+    bool inTargetBlock = false;
+
     while (std::getline(backingFile, line)) {
         std::istringstream iss(line);
-        int readPID, page;
-        if (!(iss >> readPID >> page))
-            throw std::runtime_error("Backing store file is malformed, please check it.");
+        int readPID, readPage;
 
-        // Skip the page to be loaded back in
-        if (readPID == pid && page == pageNumber) {
-            continue;
+        if ((iss >> readPID >> readPage)) {
+            if (inTargetBlock) {
+                tempFile << line << "\n";
+                inTargetBlock = false;
+                continue;
+            }
+
+            if (readPID == pid && readPage == pageNumber) {
+                inTargetBlock = true;
+                continue;
+            }
         }
 
-        tempFile << line << "\n";  // Keep all other lines
+        if (inTargetBlock) {
+            if (line.starts_with("VAL")) {
+                std::string tag;
+                int offset;
+                uint16_t value;
+                size_t xIndex = line.find(" x");
+
+                int count = 1;
+                if (xIndex != std::string::npos) {
+                    std::string prefix = line.substr(0, xIndex);
+                    std::string suffix = line.substr(xIndex + 2);
+                    std::istringstream(prefix) >> tag >> offset >> value;
+                    count = std::stoi(suffix);
+                } else {
+                    iss.clear();
+                    iss.str(line);
+                    iss >> tag >> offset >> value;
+                }
+
+                for (int i = 0; i < count; ++i) {
+                    int addr = offset + (i * 2);
+                    if (addr + 1 < static_cast<int>(storedData.size())) {
+                        auto high = static_cast<uint8_t>((value >> 8) & 0xFF);
+                        auto low = static_cast<uint8_t>(value & 0xFF);
+                        storedData[addr] = static_cast<uint16_t>(high);
+                        storedData[addr + 1] = static_cast<uint16_t>(low);
+                    }
+                }
+            } else if (line.starts_with("INS")) {
+                std::string tag;
+                int offset;
+                iss.clear();
+                iss.str(line);
+                iss >> tag >> offset;
+
+                std::string serializedInstr = line.substr(line.find_first_of(" \t", 4) + 1);
+                std::istringstream instrStream(serializedInstr);
+                auto instr = InstructionFactory::deserializeInstruction(instrStream);
+
+                if (offset >= 0 && offset < static_cast<int>(storedData.size())) {
+                    storedData[offset] = instr;
+                }
+            }
+        } else {
+            tempFile << line << "\n";
+        }
     }
 
     backingFile.close();
     tempFile.close();
 
-    // 3. Replace the backing store with the temp file
     std::remove(BACKING_STORE_FILE);
     std::rename("temp.txt", BACKING_STORE_FILE);
+
+    return storedData;
 }

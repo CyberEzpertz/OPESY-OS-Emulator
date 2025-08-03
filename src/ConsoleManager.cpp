@@ -94,7 +94,7 @@ bool ConsoleManager::createDummyProcess(const std::string& processName) {
     processIDList.push_back(newProcess);
 
     const std::vector<std::shared_ptr<Instruction>> instructions =
-        InstructionFactory::generateInstructions(PID, processName);
+        InstructionFactory::generateInstructions(PID, processName, requiredMemory);
 
     newProcess->setInstructions(instructions, true);
     ProcessScheduler::getInstance().scheduleProcess(newProcess);
@@ -145,6 +145,7 @@ std::shared_ptr<Process> ConsoleManager::getProcessByPID(const int processID) {
     std::shared_lock lock(processListMutex);
 
     if (processID >= processIDList.size()) {
+        std::println("Tried to access {} but size is {}", processID, processIDList.size());
         return nullptr;
     }
 

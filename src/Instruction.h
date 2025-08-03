@@ -8,7 +8,7 @@ class Instruction {
 protected:
     int lineCount;
     int pid;
-
+    std::string opCode;
     std::shared_ptr<Process> getProcess() const;
 
 public:
@@ -26,6 +26,8 @@ public:
     virtual bool isComplete() const {
         return true;
     }
+
+    virtual std::string serialize() const = 0;
 
     virtual void execute() = 0;
 

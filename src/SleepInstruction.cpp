@@ -3,8 +3,8 @@
 #include "ConsoleManager.h"
 #include "ProcessScheduler.h"
 
-SleepInstruction::SleepInstruction(const uint8_t ticks, const int pid)
-    : Instruction(1, pid), ticks(ticks) {
+SleepInstruction::SleepInstruction(const uint8_t ticks, const int pid) : Instruction(1, pid), ticks(ticks) {
+    this->opCode = "SLEEP";
 }
 
 void SleepInstruction::execute() {
@@ -16,4 +16,8 @@ void SleepInstruction::execute() {
     process->setStatus(WAITING);
 
     ProcessScheduler::getInstance().sleepProcess(process);
+}
+
+std::string SleepInstruction::serialize() const {
+    return std::format("SLEEP {} {}", ticks, pid);
 }

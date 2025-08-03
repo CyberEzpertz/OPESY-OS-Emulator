@@ -11,6 +11,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <memory>
 #include <set>
 #include <shared_mutex>
 #include <sstream>
@@ -33,9 +34,8 @@ Process::Process(const int id, const std::string& name, const uint64_t requiredM
       currentInstructionIndex(0),
       status(READY),
       currentCore(-1),
-      variables({}),
       wakeupTick(0),
-      maxHeapMemory(0) {
+      variableAddresses({}) {
     timestamp = generateTimestamp();
 }
 
@@ -100,24 +100,41 @@ void Process::log(const std::string& entry) {
     logs.push_back(entry);
 }
 
+void Process::safePageFault(const int page) const {
+    PagingAllocator& allocator = PagingAllocator::getInstance();
+    if (!pageTable[page].isValid || !allocator.pinFrame(pageTable[page].frameNumber, processID, page)) {
+        allocator.handlePageFault(this->processID, page);
+    }
+}
+
 /**
  * @brief Increments the current line number, up to the total number of lines.
  */
 void Process::incrementLine() {
     std::lock_guard lock(instructionsMutex);
     if (currentLine < totalLines) {
-        // [IMPORTANT] This code below is if instructions are used in paging, comment if needed
-        const int instructionPage = (currentLine * INSTRUCTION_SIZE) / Config::getInstance().getMemPerFrame();
-        if (!pageTable[instructionPage].isValid) {
-            PagingAllocator::getInstance().handlePageFault(this->processID, instructionPage);
+        const int instrAddress = (currentInstructionIndex * INSTRUCTION_SIZE);
+        const auto [page, offset] = splitAddress(instrAddress);
+        safePageFault(page);
+
+        {
+            // std::lock_guard pageLock(pageTableMutex);
+            auto frameNumber = pageTable[page].frameNumber;
+
+            const auto instr = PagingAllocator::getInstance().readFromFrame(frameNumber, offset);
+
+            if (!std::holds_alternative<std::shared_ptr<Instruction>>(instr)) {
+                throw std::runtime_error(std::format("Frame {} Offset {} is not an instruction.", frameNumber, offset));
+            }
+
+            const auto parsedInstr = std::get<std::shared_ptr<Instruction>>(instr);
+            parsedInstr->execute();
+
+            currentLine++;
+
+            if (parsedInstr->isComplete())
+                currentInstructionIndex++;
         }
-
-        instructions[currentInstructionIndex]->execute();
-
-        currentLine++;
-
-        if (instructions[currentInstructionIndex]->isComplete())
-            currentInstructionIndex++;
     }
 
     if (currentLine >= totalLines) {
@@ -146,6 +163,8 @@ void Process::setInstructions(const std::vector<std::shared_ptr<Instruction>>& i
     // Set instruction-related props
     this->instructions = instructions;
     this->totalLines = 0;
+
+    const int instructionBytes = instructions.size() * INSTRUCTION_SIZE;
     for (const auto& instr : instructions) {
         this->totalLines += instr->getLineCount();
     }
@@ -153,7 +172,7 @@ void Process::setInstructions(const std::vector<std::shared_ptr<Instruction>>& i
     // In the case that instructions are not counted in initial required memory
     // We can set this flag to be true
     if (addToMemory) {
-        requiredMemory += totalLines * INSTRUCTION_SIZE;
+        requiredMemory += instructionBytes;
     }
 
     // Initialize pageTable
@@ -161,62 +180,67 @@ void Process::setInstructions(const std::vector<std::shared_ptr<Instruction>>& i
     const size_t numPages = std::ceil(static_cast<double>(requiredMemory) / pageSize);
     pageTable.resize(numPages);
 
-    // Calculate symbol table segment (which should be after instructions)
-    const int symbolTableStartByte = totalLines * INSTRUCTION_SIZE;
-    const int symbolTableEndByte = symbolTableStartByte + MAX_VARIABLES * 2;
-
-    const int symbolStartPage = symbolTableStartByte / pageSize;
-    const int symbolEndPage = (symbolTableEndByte - 1) / pageSize;  // inclusive
-
-    // Insert the pages required for symbol table inside the set
-    for (int page = symbolStartPage; page <= symbolEndPage; ++page) {
-        symbolTablePages.insert(page);
-    }
-
-    // Calculate the heap segment
-    heapStartPage = symbolTableEndByte / pageSize;
-    heapStartOffset = symbolTableEndByte % pageSize;
-
-    // Calculate how many bytes are allocated for heap segment
-    const int heapBytes = numPages * pageSize - (heapStartPage * pageSize + heapStartOffset);
-    heapMemory.resize(heapBytes);
+    segmentBoundaries[TEXT] = instructionBytes;
+    segmentBoundaries[DATA] = segmentBoundaries[TEXT] + MAX_VARIABLES * VARIABLE_SIZE;
+    segmentBoundaries[HEAP] = requiredMemory;
 }
 
 bool Process::setVariable(const std::string& name, const uint16_t value) {
-    std::lock_guard lock(scopeMutex);
+    std::lock_guard lock(variableMutex);
 
-    // Check if entire symbol table is loaded
-    for (const int page : symbolTablePages) {
-        if (!pageTable[page].isValid) {
-            PagingAllocator::getInstance().handlePageFault(processID, page);
-        }
+    // Variable must already be declared
+    if (!variableAddresses.contains(name)) {
+        return false;
     }
 
-    if (variables.contains(name)) {
-        variables[name] = value;
-        return true;
-    }
+    const auto address = variableAddresses[name];
+    const auto [page, offset] = splitAddress(address);
 
-    return false;
+    safePageFault(page);
+
+    const auto frame = pageTable[page].frameNumber;
+    PagingAllocator::getInstance().writeToFrame(frame, offset, value);
+
+    return true;
 }
 
 uint16_t Process::getVariable(const std::string& name) {
-    std::lock_guard lock(scopeMutex);
+    std::lock_guard lock(variableMutex);
 
-    for (const int page : symbolTablePages) {
-        if (!pageTable[page].isValid) {
-            PagingAllocator::getInstance().handlePageFault(processID, page);
-        }
+    // CASE 1: Variable has been declared already
+    if (variableAddresses.contains(name)) {
+        const auto [page, offset] = splitAddress(variableAddresses[name]);
+
+        safePageFault(page);
+
+        const auto frameNumber = pageTable[page].frameNumber;
+        const auto data = PagingAllocator::getInstance().readFromFrame(frameNumber, offset);
+
+        if (std::holds_alternative<uint16_t>(data))
+            return std::get<uint16_t>(data);
+
+        throw std::runtime_error(std::format("Variable '{}' at address 0x{:04X} is not a uint16_t", name,
+                                             static_cast<int>(variableAddresses[name])));
     }
 
-    if (variables.contains(name)) {
-        return variables[name];
+    // CASE 2: Variable has not been declared yet
+    const auto symbolTableStart = segmentBoundaries[TEXT];
+
+    // CASE 2.1: Symbol Table limit reached
+    if (variableOrder.size() >= MAX_VARIABLES) {
+        return 0;
     }
 
-    if (variables.size() < MAX_VARIABLES) {
-        variables[name] = 0;
+    // CASE 2.2: Variable can be declared
+    if (symbolTableStart + variableOrder.size() * VARIABLE_SIZE > requiredMemory) {
+        throw std::runtime_error("Tried to declare new variable while reading but memory exceeded");
     }
 
+    const uint16_t nextAddress = symbolTableStart + variableOrder.size() * VARIABLE_SIZE;
+    variableAddresses[name] = nextAddress;
+    variableOrder.push_back(name);
+
+    // Return 0 since it's an uninitialized variable
     return 0;
 }
 
@@ -232,25 +256,39 @@ void Process::setWakeupTick(const uint64_t value) {
 }
 
 bool Process::declareVariable(const std::string& name, uint16_t value) {
-    std::lock_guard lock(scopeMutex);
+    std::lock_guard lock(variableMutex);
 
-    for (const int page : symbolTablePages) {
-        if (!pageTable[page].isValid) {
-            PagingAllocator::getInstance().handlePageFault(processID, page);
-        }
-    }
-
-    // If we're pass max variables, just ignore according to project specs
-    if (variables.size() >= MAX_VARIABLES) {
-        return true;
-    }
-
-    // Don't allow double declarations of the same variable
-    if (variables.contains(name)) {
+    // Don't allow double declarations
+    if (variableAddresses.contains(name)) {
         return false;
     }
 
-    variables[name] = value;
+    // If we've reached max variables, ignore as per spec
+    if (variableAddresses.size() >= MAX_VARIABLES) {
+        return true;
+    }
+
+    const auto symbolTableStart = segmentBoundaries[TEXT];
+    const uint16_t nextAddress = symbolTableStart + variableOrder.size() * VARIABLE_SIZE;
+
+    // Ensure we don't exceed required memory
+    if (nextAddress >= requiredMemory) {
+        throw std::runtime_error("Memory exceeded during variable declaration");
+    }
+
+    const auto [page, offset] = splitAddress(nextAddress);
+
+    // Ensure page is loaded
+    safePageFault(page);
+
+    // Write initial value
+    const auto frame = pageTable[page].frameNumber;
+    PagingAllocator::getInstance().writeToFrame(frame, offset, value);
+
+    // Track variable
+    variableAddresses[name] = nextAddress;
+    variableOrder.push_back(name);
+
     return true;
 }
 
@@ -269,12 +307,14 @@ PageEntry Process::getPageEntry(const int pageNumber) const {
 }
 
 void Process::swapPageOut(const int pageNumber) {
+    std::lock_guard lock(pageTableMutex);
     pageTable[pageNumber].isValid = false;
     pageTable[pageNumber].inBackingStore = true;
     pageTable[pageNumber].frameNumber = -1;
 }
 
 void Process::swapPageIn(const int pageNumber, const int frameNumber) {
+    std::lock_guard lock(pageTableMutex);
     pageTable[pageNumber].isValid = true;
     pageTable[pageNumber].inBackingStore = false;
     pageTable[pageNumber].frameNumber = frameNumber;
@@ -288,31 +328,22 @@ void Process::shutdown(int invalidAddress) {
     status = DONE;
 }
 
-// Converts the virtual memory address into the heap index
-int Process::convertAddressToHeapIdx(const int address) const {
-    const auto pageSize = Config::getInstance().getMemPerFrame();
-    const int heapAddressStart = heapStartPage * pageSize + heapStartOffset;
+std::pair<int, int> Process::splitAddress(const int address) {
+    const int pageSize = Config::getInstance().getMemPerFrame();
+    const int page = address / pageSize;
+    const int offset = address % pageSize;
 
-    // Align it so that it doesn't break
-    if (address % 2 == 1) {
-        return (address - 1) - heapAddressStart;
-    }
-
-    return address - heapAddressStart;
+    return {page, offset};
 }
 
 // Checks if the given address is inside the heap
 bool Process::isValidHeapAddress(const int address) const {
-    const auto pageSize = Config::getInstance().getMemPerFrame();
-    const int heapAddressStart = heapStartPage * pageSize + heapStartOffset;
-
-    return address > heapAddressStart && address < requiredMemory;
+    return address >= segmentBoundaries.at(DATA) && address < segmentBoundaries.at(HEAP);
 }
 
 // Writes to given address if possible, shuts down if not
 void Process::writeToHeap(const int address, const uint16_t value) {
-    const auto pageSize = Config::getInstance().getMemPerFrame();
-    const int pageNumber = address / pageSize;
+    std::lock_guard lock(heapMutex);
 
     // Invalid memory access criteria:
     // 1. Address is outside of heap bounds
@@ -321,38 +352,71 @@ void Process::writeToHeap(const int address, const uint16_t value) {
         return;
     }
 
-    if (!pageTable[pageNumber].isValid) {
-        PagingAllocator::getInstance().handlePageFault(processID, pageNumber);
+    auto [page, offset] = splitAddress(address);
+
+    // Align memory to 16-bit boundary
+    if (offset % 2 == 1) {
+        offset -= 1;
     }
 
-    // Convert raw virtual memory address into index
-    const auto heapIndex = convertAddressToHeapIdx(address);
+    // Ensure the page is loaded
+    safePageFault(page);
 
-    heapMemory[heapIndex] = value & 0xFF;             // lower byte
-    heapMemory[heapIndex + 1] = (value >> 8) & 0xFF;  // upper byte
+    const auto frameNumber = pageTable[page].frameNumber;
+
+    PagingAllocator::getInstance().writeToFrame(frameNumber, offset, value);
+}
+
+PageData Process::getPageData(const int pageNumber) const {
+    const auto pageSize = Config::getInstance().getMemPerFrame();
+    const int start = pageNumber * pageSize;
+    const int end = start + pageSize;
+
+    std::vector<std::optional<StoredData>> data;
+    // Iterate through the memory
+    for (int i = start; i < end; i += 2) {
+        if (i < segmentBoundaries.at(TEXT)) {
+            auto instruction = instructions[i / INSTRUCTION_SIZE];
+            data.push_back(instruction);
+            data.push_back(std::nullopt);
+        } else {
+            // Will be 0 because no variables/memory has been written to yet
+            data.push_back(static_cast<uint16_t>(0));
+            data.push_back(static_cast<uint16_t>(0));
+        }
+    }
+
+    return data;
 }
 
 // Reads the given address if possible, shuts down if not
 uint16_t Process::readFromHeap(const int address) {
-    const auto pageSize = Config::getInstance().getMemPerFrame();
-    const int pageNumber = address / pageSize;
-
+    std::lock_guard lock(heapMutex);
     // Invalid memory access criteria:
     // 1. Address is outside of heap bounds
-    // 2. Address is inside, but it's an odd number
     if (!isValidHeapAddress(address)) {
         shutdown(address);
         return 0;
     }
 
-    if (!pageTable[pageNumber].isValid) {
-        PagingAllocator::getInstance().handlePageFault(processID, pageNumber);
+    auto [page, offset] = splitAddress(address);
+
+    // Align memory
+    if (offset % 2 == 1) {
+        offset -= 1;
     }
 
-    const auto heapIndex = convertAddressToHeapIdx(address);
+    // Ensure page is loaded
+    safePageFault(page);
 
-    // Combine the two halves here
-    return heapMemory[heapIndex] | (heapMemory[heapIndex + 1] << 8);
+    const auto frameNumber = pageTable[page].frameNumber;
+
+    const auto data = PagingAllocator::getInstance().readFromFrame(frameNumber, offset);
+
+    if (std::holds_alternative<uint16_t>(data))
+        return std::get<uint16_t>(data);
+
+    throw std::runtime_error(std::format("Data at address 0x{:04X} is not a uint16_t", address));
 }
 
 /**
@@ -393,7 +457,7 @@ void Process::writeLogToFile() const {
  * time.
  * @return A string formatted as MM/DD/YYYY, HH:MM:SS AM/PM.
  */
-std::string Process::generateTimestamp() const {
+std::string Process::generateTimestamp() {
     auto now = std::chrono::system_clock::now();
     std::time_t timeT = std::chrono::system_clock::to_time_t(now);
     std::tm local_tm = *std::localtime(&timeT);
@@ -404,7 +468,7 @@ std::string Process::generateTimestamp() const {
 }
 
 std::uint64_t Process::getMemoryUsage() const {
-    std::lock_guard lock(scopeMutex);
+    // std::lock_guard lock(variableMutex);
     uint64_t memoryUsage = 0;
     const auto pageSize = Config::getInstance().getMemPerFrame();
 
@@ -414,4 +478,36 @@ std::uint64_t Process::getMemoryUsage() const {
     }
 
     return memoryUsage;
+}
+
+void Process::precomputeInstructionPages() {
+    const auto pageSize = Config::getInstance().getMemPerFrame();
+    std::vector<PageData> pages;
+
+    PageData currentPage(pageSize, std::nullopt);
+    size_t offset = 0;
+
+    for (const auto& instr : instructions) {
+        const size_t size = instr->getLineCount() * INSTRUCTION_SIZE;
+
+        for (size_t i = 0; i < size; ++i) {
+            if (offset == pageSize) {
+                pages.push_back(std::move(currentPage));
+                currentPage = PageData(pageSize, std::nullopt);
+                offset = 0;
+            }
+
+            if (i == 0) {
+                currentPage[offset++] = StoredData{instr};  // first byte points to instruction
+            } else {
+                currentPage[offset++] = std::nullopt;  // claimed, but not instruction start
+            }
+        }
+    }
+
+    if (offset > 0) {
+        pages.push_back(std::move(currentPage));
+    }
+
+    this->precomputedPages = std::move(pages);
 }

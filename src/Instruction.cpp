@@ -7,13 +7,12 @@ std::shared_ptr<Process> Instruction::getProcess() const {
 
     if (!process) {
         throw std::runtime_error(
-            "Instruction tried to access invalid process.");
+            std::format("Instruction tried to access invalid process {}. Opcode: {}", pid, opCode));
     }
 
     return process;
 }
-Instruction::Instruction(const int lines, const int pid)
-    : lineCount(lines), pid(pid) {
+Instruction::Instruction(const int lines, const int pid) : lineCount(lines), pid(pid) {
 }
 
 int Instruction::getLineCount() const noexcept {

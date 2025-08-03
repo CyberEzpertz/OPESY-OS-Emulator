@@ -10,3 +10,7 @@ void WriteInstruction::execute() {
     const auto proc = getProcess();
     proc->writeToHeap(address, value);
 }
+
+std::string WriteInstruction::serialize() const {
+    return std::format("WRITE {} {} {}", address, value, pid);
+}

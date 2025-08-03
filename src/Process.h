@@ -5,22 +5,25 @@
 #pragma once
 
 #include <atomic>
-#include <set>
+#include <memory>
 #include <shared_mutex>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
 #include "Instruction.h"
-#include "PrintInstruction.h"
+#include "PagingAllocator.h"
 
 enum ProcessStatus { READY, RUNNING, WAITING, DONE };
+enum MemorySegment { TEXT, DATA, HEAP };
 
 struct PageEntry {
     int frameNumber = -1;
     bool isValid;
     bool inBackingStore;
 };
+
+using PageData = std::vector<std::optional<StoredData>>;
 
 /**
  * @class Process
@@ -78,6 +81,7 @@ public:
      * @param entry The log entry to add.
      */
     void log(const std::string& entry);
+    void safePageFault(int page) const;
 
     /**
      * @brief Increments the current line number by 1, up to the total number of
@@ -112,6 +116,7 @@ public:
     void setBaseAddress(void* ptr);
     void* getBaseAddress() const;
     PageEntry getPageEntry(int pageNumber) const;
+    PageData getPageData(int pageNumber) const;
 
     void swapPageOut(int pageNumber);
     void swapPageIn(int pageNumber, int frameNumber);
@@ -120,6 +125,7 @@ public:
     void writeToHeap(int address, uint16_t value);
     uint16_t readFromHeap(int address);
     std::uint64_t getMemoryUsage() const;
+    void precomputeInstructionPages();
 
 private:
     int processID;                  ///< Unique identifier for the process.
@@ -134,22 +140,27 @@ private:
     std::string timestamp;        ///< Timestamp when the process was created.
     std::atomic<ProcessStatus> status;
     std::atomic<int> currentCore;
-    std::vector<std::shared_ptr<Instruction>> instructions;
-    std::unordered_map<std::string, uint16_t> variables;
     uint64_t wakeupTick;
     uint64_t lastInstructionCycle = 0;
-    mutable std::mutex scopeMutex;
+
+    // Upper boundary of each memory segment(text, data, etc.)
+    std::unordered_map<MemorySegment, uint16_t> segmentBoundaries;
+
+    std::vector<std::shared_ptr<Instruction>> instructions;
     mutable std::mutex instructionsMutex;
 
+    std::unordered_map<std::string, uint16_t> variableAddresses;
+    std::vector<std::string> variableOrder;
+    mutable std::mutex variableMutex;
+
+    mutable std::mutex heapMutex;
+
+    static std::pair<int, int> splitAddress(int address);
+
     std::vector<PageEntry> pageTable;
-    std::set<int> symbolTablePages;
+    mutable std::mutex pageTableMutex;
+    std::vector<PageData> precomputedPages;
 
-    std::vector<uint16_t> heapMemory;
-    size_t maxHeapMemory;
-    int heapStartPage = 0;
-    int heapStartOffset = 0;
-
-    int convertAddressToHeapIdx(int address) const;
     bool isValidHeapAddress(int address) const;
 
     bool didShutdown = false;
@@ -159,5 +170,5 @@ private:
      * @brief Generates a formatted timestamp for the process creation time.
      * @return A string with the current local date and time.
      */
-    std::string generateTimestamp() const;
+    static std::string generateTimestamp();
 };

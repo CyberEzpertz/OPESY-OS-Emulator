@@ -7,6 +7,7 @@
 #include <iostream>
 #include <print>
 #include <ranges>
+#include <set>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -371,60 +372,104 @@ void MainScreen::generateProcessSMI() {
     const auto coreAssignments = scheduler.getCoreAssignments();
     constexpr std::string_view header = "| PROCESS-SMI V01.00 Driver Version: 01.00 |";
 
+    setColor(36);  // Cyan
     std::println("{}", std::string(header.length(), '-'));
+    setColor(1);  // Bold
     std::println(header);
+    resetColor();
+    setColor(36);
     std::println("{}", std::string(header.length(), '-'));
+    resetColor();
 
-    std::println("CPU-Util: {:.0f}%", cpuUtil);
-    std::println("Memory Usage: {}B / {}B", usedMem, totalMem);
-    std::println("Memory Util: {:.0f}%", memUtil);
+    setColor(32);  // Green
+    std::print("CPU-Util: ");
+    setColor(33);  // Yellow
+    std::println("{:.0f}%", cpuUtil);
+
+    setColor(32);
+    std::print("Memory Usage: ");
+    setColor(33);
+    std::println("{}B / {}B", usedMem, totalMem);
+
+    setColor(32);
+    std::print("Memory Util: ");
+    setColor(33);
+    std::println("{:.0f}%", memUtil);
+    resetColor();
+
+    setColor(36);
     std::println("{}", std::string(header.length(), '='));
+    resetColor();
 
+    setColor(1);
     std::println("Running processes and memory usage:");
-    std::println("{}", std::string(header.length(), '-'));
+    resetColor();
 
-    int i = 0;
-    // Prevents printing the same process twice.
-    // A process that enters WAITING may still appear in a core until the next tick,
-    // so it's treated as both waiting and assigned briefly.
+    setColor(2);  // Dim
+    std::println("{}", std::string(header.length(), '-'));
+    resetColor();
+
     std::set<int> seenProcessIds;
+    int coreIndex = 0;
 
     for (const auto& process : coreAssignments) {
-        if (process == nullptr)
+        if (!process)
             continue;
-        std::println("Core {}:\t {}\t {}B\t {}", i, process->getName(), process->getMemoryUsage(),
-                     process->getStatus() == RUNNING ? "RUNNING" : "OTHER");
 
+        setColor(36);  // Cyan
+        std::print("Core {:<2}:  ", coreIndex);
+        resetColor();
+
+        std::print("{:<12} {:<8} ", process->getName(), process->getMemoryUsage());
+
+        if (process->getStatus() == RUNNING) {
+            setColor(32);  // Green
+            std::println("RUNNING");
+        } else {
+            setColor(33);  // Yellow
+            std::println("OTHER");
+        }
+
+        resetColor();
         seenProcessIds.insert(process->getID());
-        ++i;
+        ++coreIndex;
     }
 
+    setColor(2);  // Dim
     std::println("{}", std::string(header.length(), '-'));
+    resetColor();
+
+    setColor(1);
     std::println("Ready/Waiting processes with memory usage:");
+    resetColor();
+
+    setColor(2);  // Dim
     std::println("{}", std::string(header.length(), '-'));
+    resetColor();
 
     for (const auto& process : ConsoleManager::getInstance().getProcessIdList()) {
-        if (!process || seenProcessIds.contains(process->getID())) {
+        if (!process || seenProcessIds.contains(process->getID()))
             continue;
-        }
 
         const auto status = process->getStatus();
-        if ((status != WAITING && status != READY) || process->getMemoryUsage() <= 0) {
+        if ((status != WAITING && status != READY) || process->getMemoryUsage() <= 0)
             continue;
-        }
 
-        std::string statusString = "";
         if (status == WAITING) {
-            statusString = "WAITING";
+            setColor(35);  // Magenta
+            std::print("WAITING  ");
         } else {
-            statusString = "READY";
+            setColor(34);  // Blue
+            std::print("READY    ");
         }
 
-        std::println("{}\t {}\t {}B", statusString, process->getName(), process->getMemoryUsage());
-        ++i;
+        resetColor();
+        std::println("{:<12} {:<8}B", process->getName(), process->getMemoryUsage());
     }
 
+    setColor(2);  // Dim
     std::println("{}", std::string(header.length(), '-'));
+    resetColor();
 }
 
 void MainScreen::generateVmStat() {
