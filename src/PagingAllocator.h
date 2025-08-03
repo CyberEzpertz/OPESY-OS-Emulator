@@ -14,7 +14,7 @@ using StoredData = std::variant<uint16_t, std::shared_ptr<Instruction>>;
 struct FrameInfo {
     int pid = -1;
     int pageNumber = -1;
-    std::vector<StoredData> data;
+    std::vector<std::optional<StoredData>> data;
 };
 
 class PagingAllocator {
@@ -39,6 +39,7 @@ public:
     int getNumPagedIn() const;
     int getNumPagedOut() const;
     int getFreeMemory() const;
+    std::optional<uint16_t> readUint16FromFrame(int frameNumber, int offset) const;
 
     StoredData readFromFrame(int frameNumber, int offset) const;
     void writeToFrame(int frameNumber, int offset, const uint16_t data);
@@ -46,13 +47,13 @@ public:
 private:
     PagingAllocator();
 
-    int allocateFrame(int pid, int pageNumber);
+    int allocateFrame(int pid, int pageNumber, const std::vector<std::optional<StoredData>>& pageData);
     int evictVictimFrame();
     int getVictimFrame();
     void freeFrame(int frameIndex);
 
     void swapOut(int frameIndex);
-    std::vector<StoredData> swapIn(int pid, int pageNumber) const;
+    std::vector<std::optional<StoredData>> swapIn(int pid, int pageNumber) const;
 
     size_t totalFrames;
     std::atomic<size_t> allocatedFrames = 0;

@@ -94,7 +94,7 @@ bool ConsoleManager::createDummyProcess(const std::string& processName) {
     processIDList.push_back(newProcess);
 
     const std::vector<std::shared_ptr<Instruction>> instructions =
-        InstructionFactory::generateInstructions(PID, processName);
+        InstructionFactory::generateInstructions(PID, processName, requiredMemory);
 
     newProcess->setInstructions(instructions, true);
     ProcessScheduler::getInstance().scheduleProcess(newProcess);

@@ -9,9 +9,9 @@ public:
     void execute() override;
     bool isComplete() const override;
     void restartCounters();
-    ForInstruction(
-        const int pid, int totalLoops,
-        const std::vector<std::shared_ptr<Instruction>> &instructions);
+    std::string serialize() const override;
+    std::vector<std::shared_ptr<Instruction>> expand() const;
+    ForInstruction(const int pid, int totalLoops, const std::vector<std::shared_ptr<Instruction>> &instructions);
 
 private:
     int totalLoops;

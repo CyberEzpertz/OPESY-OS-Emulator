@@ -7,4 +7,5 @@ public:
 private:
     uint8_t ticks;
     void execute() override;
+    std::string serialize() const override;
 };

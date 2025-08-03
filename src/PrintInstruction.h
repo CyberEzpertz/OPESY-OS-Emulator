@@ -15,10 +15,10 @@ private:
 
 public:
     PrintInstruction(const std::string& msg, const int pid);
-    PrintInstruction(const std::string& msg, const int pid,
-                     const std::string& varName);
+    PrintInstruction(const std::string& msg, const int pid, const std::string& varName);
 
     void execute() override;
 
     [[nodiscard]] const std::string& getMessage() const noexcept;
+    std::string serialize() const override;
 };

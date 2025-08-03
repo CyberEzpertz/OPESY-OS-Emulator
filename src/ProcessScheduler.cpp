@@ -149,6 +149,9 @@ void ProcessScheduler::stopDummyGeneration() {
         return;
     }
 
+    // Notify the waiting thread
+    tickCv.notify_all();
+
     if (dummyGeneratorThread.joinable())
         dummyGeneratorThread.join();
 

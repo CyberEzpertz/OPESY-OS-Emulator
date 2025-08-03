@@ -48,3 +48,32 @@ void ForInstruction::restartCounters() {
     currentLoop = 0;
     currentInstructIdx = 0;
 }
+
+std::string ForInstruction::serialize() const {
+    std::string output = std::format("FOR {} {} {}\n", pid, totalLoops, instructions.size());
+
+    for (const auto &instr : instructions) {
+        output += instr->serialize();
+        output += "\n";
+    }
+
+    output += "END\n";
+    return output;
+}
+
+std::vector<std::shared_ptr<Instruction>> ForInstruction::expand() const {
+    std::vector<std::shared_ptr<Instruction>> result;
+
+    for (int loop = 0; loop < totalLoops; ++loop) {
+        for (const auto &instr : instructions) {
+            if (const auto nestedFor = std::dynamic_pointer_cast<ForInstruction>(instr)) {
+                auto expanded = nestedFor->expand();
+                result.insert(result.end(), expanded.begin(), expanded.end());
+            } else {
+                result.push_back(instr);
+            }
+        }
+    }
+
+    return result;
+}

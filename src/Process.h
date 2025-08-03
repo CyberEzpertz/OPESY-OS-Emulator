@@ -5,6 +5,7 @@
 #pragma once
 
 #include <atomic>
+#include <memory>
 #include <shared_mutex>
 #include <string>
 #include <unordered_map>
@@ -21,6 +22,8 @@ struct PageEntry {
     bool isValid;
     bool inBackingStore;
 };
+
+using PageData = std::vector<std::optional<StoredData>>;
 
 /**
  * @class Process
@@ -112,7 +115,7 @@ public:
     void setBaseAddress(void* ptr);
     void* getBaseAddress() const;
     PageEntry getPageEntry(int pageNumber) const;
-    std::vector<StoredData> getPageData(int pageNumber) const;
+    PageData getPageData(int pageNumber) const;
 
     void swapPageOut(int pageNumber);
     void swapPageIn(int pageNumber, int frameNumber);
@@ -121,6 +124,7 @@ public:
     void writeToHeap(int address, uint16_t value);
     uint16_t readFromHeap(int address);
     std::uint64_t getMemoryUsage() const;
+    void precomputeInstructionPages();
 
 private:
     int processID;                  ///< Unique identifier for the process.
@@ -153,6 +157,7 @@ private:
     static std::pair<int, int> splitAddress(int address);
 
     std::vector<PageEntry> pageTable;
+    std::vector<PageData> precomputedPages;
 
     bool isValidHeapAddress(int address) const;
 

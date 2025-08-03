@@ -11,6 +11,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <memory>
 #include <set>
 #include <shared_mutex>
 #include <sstream>
@@ -145,6 +146,8 @@ void Process::setInstructions(const std::vector<std::shared_ptr<Instruction>>& i
     // Set instruction-related props
     this->instructions = instructions;
     this->totalLines = 0;
+
+    const int instructionBytes = instructions.size() * INSTRUCTION_SIZE;
     for (const auto& instr : instructions) {
         this->totalLines += instr->getLineCount();
     }
@@ -152,7 +155,7 @@ void Process::setInstructions(const std::vector<std::shared_ptr<Instruction>>& i
     // In the case that instructions are not counted in initial required memory
     // We can set this flag to be true
     if (addToMemory) {
-        requiredMemory += totalLines * INSTRUCTION_SIZE;
+        requiredMemory += instructionBytes;
     }
 
     // Initialize pageTable
@@ -160,7 +163,7 @@ void Process::setInstructions(const std::vector<std::shared_ptr<Instruction>>& i
     const size_t numPages = std::ceil(static_cast<double>(requiredMemory) / pageSize);
     pageTable.resize(numPages);
 
-    segmentBoundaries[TEXT] = totalLines * INSTRUCTION_SIZE;
+    segmentBoundaries[TEXT] = instructionBytes;
     segmentBoundaries[DATA] = segmentBoundaries[TEXT] + MAX_VARIABLES * VARIABLE_SIZE;
     segmentBoundaries[HEAP] = requiredMemory;
 }
@@ -196,6 +199,10 @@ uint16_t Process::getVariable(const std::string& name) {
 
         if (!pageTable[page].isValid) {
             PagingAllocator::getInstance().handlePageFault(processID, page);
+        }
+
+        if (!pageTable[page].isValid) {
+            throw std::runtime_error("Page faulted, but still didn't find a valid page");
         }
 
         const auto data = PagingAllocator::getInstance().readFromFrame(pageTable[page].frameNumber, offset);
@@ -348,22 +355,24 @@ void Process::writeToHeap(const int address, const uint16_t value) {
         PagingAllocator::getInstance().handlePageFault(processID, page);
     }
 
-    PagingAllocator::getInstance().writeToFrame(page, offset, value);
+    PagingAllocator::getInstance().writeToFrame(pageTable[page].frameNumber, offset, value);
 }
 
-std::vector<StoredData> Process::getPageData(const int pageNumber) const {
+PageData Process::getPageData(const int pageNumber) const {
     const auto pageSize = Config::getInstance().getMemPerFrame();
     const int start = pageNumber * pageSize;
     const int end = start + pageSize;
 
-    std::vector<StoredData> data;
-
+    std::vector<std::optional<StoredData>> data;
     // Iterate through the memory
-    for (int i = start; i < end; ++i) {
+    for (int i = start; i < end; i += 2) {
         if (i < segmentBoundaries.at(TEXT)) {
-            data.push_back(instructions[i]);
+            auto instruction = instructions[i / INSTRUCTION_SIZE];
+            data.push_back(instruction);
+            data.push_back(std::nullopt);
         } else {
             // Will be 0 because no variables/memory has been written to yet
+            data.push_back(static_cast<uint16_t>(0));
             data.push_back(static_cast<uint16_t>(0));
         }
     }
@@ -392,7 +401,7 @@ uint16_t Process::readFromHeap(const int address) {
         PagingAllocator::getInstance().handlePageFault(processID, page);
     }
 
-    const auto data = PagingAllocator::getInstance().readFromFrame(page, offset);
+    const auto data = PagingAllocator::getInstance().readFromFrame(pageTable[page].frameNumber, offset);
 
     if (std::holds_alternative<uint16_t>(data))
         return std::get<uint16_t>(data);
@@ -459,4 +468,36 @@ std::uint64_t Process::getMemoryUsage() const {
     }
 
     return memoryUsage;
+}
+
+void Process::precomputeInstructionPages() {
+    const auto pageSize = Config::getInstance().getMemPerFrame();
+    std::vector<PageData> pages;
+
+    PageData currentPage(pageSize, std::nullopt);
+    size_t offset = 0;
+
+    for (const auto& instr : instructions) {
+        const size_t size = instr->getLineCount() * INSTRUCTION_SIZE;
+
+        for (size_t i = 0; i < size; ++i) {
+            if (offset == pageSize) {
+                pages.push_back(std::move(currentPage));
+                currentPage = PageData(pageSize, std::nullopt);
+                offset = 0;
+            }
+
+            if (i == 0) {
+                currentPage[offset++] = StoredData{instr};  // first byte points to instruction
+            } else {
+                currentPage[offset++] = std::nullopt;  // claimed, but not instruction start
+            }
+        }
+    }
+
+    if (offset > 0) {
+        pages.push_back(std::move(currentPage));
+    }
+
+    this->precomputedPages = std::move(pages);
 }

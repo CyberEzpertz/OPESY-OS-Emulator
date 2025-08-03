@@ -1,4 +1,4 @@
-num-cpu 2
+num-cpu 8
 scheduler “rr”
 quantum-cycles 4
 batch-process-freq 5
