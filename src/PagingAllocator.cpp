@@ -25,6 +25,7 @@ PagingAllocator& PagingAllocator::getInstance() {
 
 PageFaultResult PagingAllocator::handlePageFault(const int pid, const int pageNumber) {
     std::vector<std::optional<StoredData>> pageData;
+    // Can be used if there's a limit on page faults
     constexpr int maxAttempts = 10;
     int attempts = 0;
 
@@ -204,7 +205,7 @@ PagingAllocator::PagingAllocator() {
     this->totalFrames = overallMem / frameSize;
     frameTable.resize(totalFrames);
 
-    for (size_t i = 0; i < totalFrames; ++i) {
+    for (int i = 0; i < totalFrames; ++i) {
         freeFrameIndices.push_back(i);
     }
 
@@ -255,8 +256,8 @@ bool PagingAllocator::evictVictimFrame() {
 }
 
 int PagingAllocator::getVictimFrame() {
-    int oldFrames = oldFramesQueue.size();
-    for (int i = 0; i < oldFrames; ++i) {
+    const size_t oldFrames = oldFramesQueue.size();
+    for (size_t i = 0; i < oldFrames; ++i) {
         const int victimIndex = oldFramesQueue.front();
         oldFramesQueue.pop_front();
 
@@ -286,38 +287,66 @@ void PagingAllocator::swapOut(const int frameIndex) {
     }
 
     const auto& [pid, pageNumber, _, _pinned] = frameTable[frameIndex];
-
-    // Lookup the owning process
     const auto process = ConsoleManager::getInstance().getProcessByPID(pid);
     if (!process) {
         throw std::runtime_error("Process not found during swapOut.");
     }
 
-    // Append to the backing store file
     std::ofstream backingFile(BACKING_STORE_FILE, std::ios::app);
     if (!backingFile) {
         throw std::runtime_error("Failed to open backing store for writing.");
     }
+
     backingFile << pid << " " << pageNumber << "\n";
 
-    for (const auto& entry : frameTable[frameIndex].data) {
-        if (!entry.has_value())
-            continue;
+    const auto& data = frameTable[frameIndex].data;
+    const int memSize = static_cast<int>(data.size());
 
-        if (std::holds_alternative<uint16_t>(entry.value())) {
-            const auto val = std::get<uint16_t>(entry.value());
-            std::print(backingFile, "VAL {}\n", val);
+    int i = 0;
+    while (i + 1 < memSize) {
+        // Check for 2-byte VAL
+        if (data[i].has_value() && data[i + 1].has_value() && std::holds_alternative<uint16_t>(data[i].value()) &&
+            std::holds_alternative<uint16_t>(data[i + 1].value())) {
+            const auto high = static_cast<uint8_t>(std::get<uint16_t>(data[i].value()));
+            const auto low = static_cast<uint8_t>(std::get<uint16_t>(data[i + 1].value()));
+            const uint16_t combined = (static_cast<uint16_t>(high) << 8) | low;
+
+            int start = i;
+            int count = 1;
+            i += 2;
+
+            // Compress repeated VALs
+            while (i + 1 < memSize && data[i].has_value() && data[i + 1].has_value() &&
+                   std::holds_alternative<uint16_t>(data[i].value()) &&
+                   std::holds_alternative<uint16_t>(data[i + 1].value())) {
+                const auto nextHigh = static_cast<uint8_t>(std::get<uint16_t>(data[i].value()));
+                const auto nextLow = static_cast<uint8_t>(std::get<uint16_t>(data[i + 1].value()));
+                const uint16_t nextCombined = (static_cast<uint16_t>(nextHigh) << 8) | nextLow;
+
+                if (nextCombined == combined) {
+                    count++;
+                    i += 2;
+                } else {
+                    break;
+                }
+            }
+
+            backingFile << "VAL " << start << " " << combined;
+            if (count > 1) {
+                backingFile << " x" << count;
+            }
+            backingFile << "\n";
+        } else if (data[i].has_value() && std::holds_alternative<std::shared_ptr<Instruction>>(data[i].value())) {
+            const auto& instr = std::get<std::shared_ptr<Instruction>>(data[i].value());
+            backingFile << "INS " << i << " " << instr->serialize() << "\n";
+            ++i;
         } else {
-            const auto& instr = std::get<std::shared_ptr<Instruction>>(entry.value());
-            std::print(backingFile, "{}\n", instr->serialize());
+            ++i;
         }
     }
 
-    // Update process page table
     process->swapPageOut(pageNumber);
     this->numPagedOut += 1;
-
-    // Free the frame
     freeFrame(frameIndex);
 }
 
@@ -332,46 +361,69 @@ std::vector<std::optional<StoredData>> PagingAllocator::swapIn(int pid, int page
         throw std::runtime_error("Failed to open temporary backing store file.");
     }
 
-    std::vector<std::optional<StoredData>> storedData;
+    std::vector<std::optional<StoredData>> storedData(Config::getInstance().getMemPerFrame(), std::nullopt);
     std::string line;
     bool inTargetBlock = false;
 
     while (std::getline(backingFile, line)) {
-        // Check if this is a header line
         std::istringstream iss(line);
         int readPID, readPage;
+
         if ((iss >> readPID >> readPage)) {
-            // If we were reading the target block, stop here
             if (inTargetBlock) {
                 tempFile << line << "\n";
                 inTargetBlock = false;
                 continue;
             }
 
-            // Found the header we want
             if (readPID == pid && readPage == pageNumber) {
                 inTargetBlock = true;
-                continue;  // don't write this header
+                continue;
             }
         }
 
         if (inTargetBlock) {
-            // This is a data line
-            if (line.starts_with("VAL ")) {
-                uint16_t val = std::stoi(line.substr(4));
-                auto highByte = static_cast<uint8_t>((val >> 8) & 0xFF);
-                auto lowByte = static_cast<uint8_t>(val & 0xFF);
+            if (line.starts_with("VAL")) {
+                std::string tag;
+                int offset;
+                uint16_t value;
+                size_t xIndex = line.find(" x");
 
-                storedData.emplace_back(highByte);
-                storedData.emplace_back(lowByte);
-            } else if (!line.empty()) {
-                std::string instructionBlock = line;
+                int count = 1;
+                if (xIndex != std::string::npos) {
+                    std::string prefix = line.substr(0, xIndex);
+                    std::string suffix = line.substr(xIndex + 2);
+                    std::istringstream(prefix) >> tag >> offset >> value;
+                    count = std::stoi(suffix);
+                } else {
+                    iss.clear();
+                    iss.str(line);
+                    iss >> tag >> offset >> value;
+                }
 
-                std::istringstream instrStream(line);
-                auto decodedInstr = InstructionFactory::deserializeInstruction(instrStream);
+                for (int i = 0; i < count; ++i) {
+                    int addr = offset + (i * 2);
+                    if (addr + 1 < static_cast<int>(storedData.size())) {
+                        auto high = static_cast<uint8_t>((value >> 8) & 0xFF);
+                        auto low = static_cast<uint8_t>(value & 0xFF);
+                        storedData[addr] = static_cast<uint16_t>(high);
+                        storedData[addr + 1] = static_cast<uint16_t>(low);
+                    }
+                }
+            } else if (line.starts_with("INS")) {
+                std::string tag;
+                int offset;
+                iss.clear();
+                iss.str(line);
+                iss >> tag >> offset;
 
-                storedData.emplace_back(decodedInstr);
-                storedData.emplace_back(std::nullopt);
+                std::string serializedInstr = line.substr(line.find_first_of(" \t", 4) + 1);
+                std::istringstream instrStream(serializedInstr);
+                auto instr = InstructionFactory::deserializeInstruction(instrStream);
+
+                if (offset >= 0 && offset < static_cast<int>(storedData.size())) {
+                    storedData[offset] = instr;
+                }
             }
         } else {
             tempFile << line << "\n";

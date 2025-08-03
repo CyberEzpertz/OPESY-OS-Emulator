@@ -47,7 +47,7 @@ public:
     bool pinFrame(int frameNumber, int pid, int pageNumber);
 
     StoredData readFromFrame(int frameNumber, int offset);
-    void writeToFrame(int frameNumber, int offset, const uint16_t data);
+    void writeToFrame(int frameNumber, int offset, uint16_t data);
 
 private:
     PagingAllocator();
