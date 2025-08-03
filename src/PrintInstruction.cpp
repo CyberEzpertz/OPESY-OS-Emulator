@@ -9,6 +9,7 @@
 
 PrintInstruction::PrintInstruction(const std::string& msg, const int pid)
     : Instruction(1, pid), message(msg), varName("") {
+    this->opCode = "PRINT";
 }
 
 PrintInstruction::PrintInstruction(const std::string& msg, const int pid, const std::string& varName)

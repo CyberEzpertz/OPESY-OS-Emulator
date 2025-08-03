@@ -145,6 +145,7 @@ std::shared_ptr<Process> ConsoleManager::getProcessByPID(const int processID) {
     std::shared_lock lock(processListMutex);
 
     if (processID >= processIDList.size()) {
+        std::println("Tried to access {} but size is {}", processID, processIDList.size());
         return nullptr;
     }
 

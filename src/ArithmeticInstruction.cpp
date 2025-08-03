@@ -5,6 +5,7 @@
 ArithmeticInstruction::ArithmeticInstruction(const std::string& resultName, const Operand& lhsVar,
                                              const Operand& rhsVar, const Operation& operation, const int pid)
     : Instruction(1, pid), operation(operation), resultName(resultName), lhsVar(lhsVar), rhsVar(rhsVar) {
+    this->opCode = "ARITH";
 }
 void ArithmeticInstruction::execute() {
     const uint16_t lhsValue = resolveOperand(lhsVar);

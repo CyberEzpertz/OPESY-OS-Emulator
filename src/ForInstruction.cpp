@@ -7,6 +7,7 @@
 ForInstruction::ForInstruction(const int pid, const int totalLoops,
                                const std::vector<std::shared_ptr<Instruction>> &instructions)
     : Instruction(0, pid), totalLoops(totalLoops), currentLoop(0), currentInstructIdx(0), instructions(instructions) {
+    this->opCode = "FOR";
     int totalLineCount = 0;
     for (const auto &line : instructions) {
         totalLineCount += line->getLineCount();

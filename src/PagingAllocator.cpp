@@ -156,7 +156,7 @@ std::optional<uint16_t> PagingAllocator::readUint16FromFrame(const int frameNumb
 
     return static_cast<uint16_t>((high << 8) | low);
 }
-bool PagingAllocator::pinFrame(int frameNumber, int pid, int pageNumber) {
+bool PagingAllocator::pinFrame(const int frameNumber, const int pid, const int pageNumber) {
     std::lock_guard lock(pagingMutex);
     const auto frame = frameTable[frameNumber];
 
