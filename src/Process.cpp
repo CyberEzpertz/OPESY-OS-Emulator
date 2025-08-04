@@ -245,7 +245,7 @@ uint16_t Process::getVariable(const std::string& name) {
 }
 
 bool Process::getIsFinished() const {
-    return currentLine >= totalLines;
+    return currentLine >= totalLines || status == DONE;
 }
 
 uint64_t Process::getWakeupTick() const {

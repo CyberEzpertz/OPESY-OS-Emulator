@@ -24,14 +24,13 @@ PagingAllocator& PagingAllocator::getInstance() {
 }
 
 PageFaultResult PagingAllocator::handlePageFault(const int pid, const int pageNumber) {
-    std::vector<std::optional<StoredData>> pageData;
-    // Can be used if there's a limit on page faults
     constexpr int maxAttempts = 10;
     int attempts = 0;
 
-    const auto process = ConsoleManager::getInstance().getProcessByPID(pid);
+    auto process = ConsoleManager::getInstance().getProcessByPID(pid);
 
-    // Load page data BEFORE retry loop (only once!)
+    // Load page data only once
+    std::vector<std::optional<StoredData>> pageData;
     {
         std::lock_guard lock(pagingMutex);
         const PageEntry entry = process->getPageEntry(pageNumber);
@@ -39,29 +38,33 @@ PageFaultResult PagingAllocator::handlePageFault(const int pid, const int pageNu
     }
 
     while (true) {
-        {
-            std::lock_guard lock(pagingMutex);
+        std::lock_guard lock(pagingMutex);
 
-            int frameIndex = allocateFrame(pid, pageNumber, pageData);
-
-            if (frameIndex != -1) {
-                process->swapPageIn(pageNumber, frameIndex);
-                this->numPagedIn += 1;
-                return SUCCESS;
-            }
-
-            const bool evicted = evictVictimFrame();
-
-            if (!evicted) {
-                // No evictable frame; give other threads a chance and retry
-            }
+        int frameIndex = allocateFrame(pid, pageNumber, pageData);
+        if (frameIndex != -1) {
+            process->swapPageIn(pageNumber, frameIndex);
+            ++numPagedIn;
+            return SUCCESS;
         }
 
-        // if (++attempts >= maxAttempts) {
-        //     return DEFERRED;
-        // }
-        // std::this_thread::yield();
+        if (!evictVictimFrame()) {
+            ++attempts;
+            std::this_thread::yield();
+            continue;
+        }
+
+        // Retry allocation after eviction
+        frameIndex = allocateFrame(pid, pageNumber, pageData);
+        if (frameIndex == -1) {
+            throw std::runtime_error("Failed to allocate frame after successful eviction");
+        }
+
+        process->swapPageIn(pageNumber, frameIndex);
+        ++numPagedIn;
+        return SUCCESS;
     }
+
+    return DEFERRED;
 }
 
 void PagingAllocator::deallocate(const int pid) {
@@ -331,14 +334,14 @@ void PagingAllocator::swapOut(const int frameIndex) {
                 }
             }
 
-            backingFile << "VAL " << start << " " << combined;
+            backingFile << "V " << start << " " << combined;
             if (count > 1) {
                 backingFile << " x" << count;
             }
             backingFile << "\n";
         } else if (data[i].has_value() && std::holds_alternative<std::shared_ptr<Instruction>>(data[i].value())) {
             const auto& instr = std::get<std::shared_ptr<Instruction>>(data[i].value());
-            backingFile << "INS " << i << " " << instr->serialize() << "\n";
+            backingFile << "I " << i << " " << instr->serialize() << "\n";
             ++i;
         } else {
             ++i;
@@ -370,7 +373,7 @@ std::vector<std::optional<StoredData>> PagingAllocator::swapIn(int pid, int page
         if (!inTargetBlock)
             continue;
 
-        if (line.starts_with("VAL")) {
+        if (line.starts_with("V")) {
             std::string tag;
             int offset;
             uint16_t value;
@@ -397,14 +400,14 @@ std::vector<std::optional<StoredData>> PagingAllocator::swapIn(int pid, int page
                     storedData[addr + 1] = static_cast<uint16_t>(low);
                 }
             }
-        } else if (line.starts_with("INS")) {
+        } else if (line.starts_with("I")) {
             std::string tag;
             int offset;
             iss.clear();
             iss.str(line);
             iss >> tag >> offset;
 
-            std::string serializedInstr = line.substr(line.find_first_of(" \t", 4) + 1);
+            std::string serializedInstr = line.substr(line.find_first_of(" \t", 2) + 1);
             std::istringstream instrStream(serializedInstr);
             auto instr = InstructionFactory::deserializeInstruction(instrStream);
 
