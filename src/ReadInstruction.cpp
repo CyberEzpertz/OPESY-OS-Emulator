@@ -6,6 +6,7 @@
 
 ReadInstruction::ReadInstruction(const std::string& variableName, int address, int pid)
     : Instruction(1, pid), variableName(variableName), address(address) {
+    this->opCode = "READ";
 }
 
 void ReadInstruction::execute() {

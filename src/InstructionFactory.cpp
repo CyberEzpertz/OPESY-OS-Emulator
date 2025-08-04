@@ -341,18 +341,26 @@ std::shared_ptr<Instruction> InstructionFactory::deserializeInstruction(std::ist
     }
 
     if (type == "WRITE") {
-        bool hasVar;
-        int addr, pid;
-        is >> hasVar >> addr;
+        std::string hasVar;
+        std::string addrVal, pidVal;
+        is >> hasVar >> addrVal;
 
-        if (hasVar) {
+        // std::println("{} {}", hasVar, addrVal);
+
+        auto addr = std::stoi(addrVal);
+
+        if (hasVar == "true") {
             std::string var;
-            is >> var >> pid;
+            is >> var >> pidVal;
+            auto pid = std::stoi(pidVal);
+            // std::println("{} {}", hasVar, pidVal);
             return std::make_shared<WriteInstruction>(addr, var, pid);
         }
 
         uint16_t val;
-        is >> val >> pid;
+        is >> val >> pidVal;
+        auto pid = std::stoi(pidVal);
+        // std::println("{} {}", hasVar, pidVal);
         return std::make_shared<WriteInstruction>(addr, val, pid);
     }
     if (type == "READ") {
