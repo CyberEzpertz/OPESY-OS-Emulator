@@ -330,13 +330,12 @@ void Process::shutdown(int invalidAddress) {
         timeOnly = timeOnly.substr(commaPos + 2);  // Skip ", "
     }
 
-    shutdownDetails = std::format(
-        "Process {} shut down due to memory access violation error that occurred at {}. 0x{:X} invalid.",
-        processName, timeOnly, invalidAddress);
+    shutdownDetails =
+        std::format("Process {} shut down due to memory access violation error that occurred at {}. 0x{:X} invalid.",
+                    processName, timeOnly, invalidAddress);
 
     status = DONE;
 }
-
 
 std::pair<int, int> Process::splitAddress(const int address) {
     const int pageSize = Config::getInstance().getMemPerFrame();

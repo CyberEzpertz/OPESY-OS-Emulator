@@ -4,6 +4,7 @@
 #include <format>
 #include <iomanip>
 #include <memory>
+#include <print>
 #include <random>
 #include <set>
 #include <string>
@@ -183,9 +184,16 @@ std::shared_ptr<Instruction> InstructionFactory::createRandomInstruction(const i
             return std::make_shared<ArithmeticInstruction>(result, lhs, rhs, Operation::SUBTRACT, pid);
         }
         case 5: {  // WRITE(address, value)
+            bool hasVar = generateRandomNum(0, 1) % 2 == 1;
             int address = generateRandomNum(startMemory, endMemory - 2);
-            uint16_t value = getRandomUint16();
-            return std::make_shared<WriteInstruction>(address, value, pid);
+
+            if (hasVar) {
+                uint16_t value = getRandomUint16();
+                return std::make_shared<WriteInstruction>(address, value, pid);
+            }
+
+            auto varName = getRandomVarName(declaredVars);
+            return std::make_shared<WriteInstruction>(address, varName, pid);
         }
         case 6: {  // READ(var, address)
             std::string result = getRandomVarName(declaredVars);
@@ -333,9 +341,26 @@ std::shared_ptr<Instruction> InstructionFactory::deserializeInstruction(std::ist
     }
 
     if (type == "WRITE") {
-        int addr, pid;
+        std::string hasVar;
+        std::string addrVal, pidVal;
+        is >> hasVar >> addrVal;
+
+        // std::println("{} {}", hasVar, addrVal);
+
+        auto addr = std::stoi(addrVal);
+
+        if (hasVar == "true") {
+            std::string var;
+            is >> var >> pidVal;
+            auto pid = std::stoi(pidVal);
+            // std::println("{} {}", hasVar, pidVal);
+            return std::make_shared<WriteInstruction>(addr, var, pid);
+        }
+
         uint16_t val;
-        is >> addr >> val >> pid;
+        is >> val >> pidVal;
+        auto pid = std::stoi(pidVal);
+        // std::println("{} {}", hasVar, pidVal);
         return std::make_shared<WriteInstruction>(addr, val, pid);
     }
     if (type == "READ") {
@@ -381,7 +406,6 @@ std::shared_ptr<Instruction> InstructionFactory::deserializeInstruction(std::ist
 
 std::vector<std::shared_ptr<Instruction>> InstructionFactory::createInstructionsFromStrings(
     const std::vector<std::string>& instructionStrings, int processID) {
-
     std::vector<std::shared_ptr<Instruction>> instructions;
     instructions.reserve(instructionStrings.size());
 
@@ -398,21 +422,40 @@ std::vector<std::shared_ptr<Instruction>> InstructionFactory::createInstructions
     return instructions;
 }
 
-std::shared_ptr<Instruction> InstructionFactory::parseInstructionString(
-    const std::string& instrStr, int processID) {
-
+std::shared_ptr<Instruction> InstructionFactory::parseInstructionString(const std::string& instrStr, int processID) {
     std::istringstream iss(instrStr);
+
     std::string command;
-    iss >> command;
+    char ch;
+    while (iss.get(ch)) {
+        if (std::isalnum(ch) || ch == '_') {
+            command += ch;
+        } else {
+            iss.unget();  // Put back non-word character
+            break;
+        }
+    }
+
+    auto parseHexAddress = [](const std::string& token) -> int {
+        std::string hexPart = token;
+
+        // Strip 0x or 0X prefix if present
+        if (hexPart.starts_with("0x") || hexPart.starts_with("0X")) {
+            hexPart = hexPart.substr(2);
+        }
+
+        int addr;
+        auto [ptr, ec] = std::from_chars(hexPart.data(), hexPart.data() + hexPart.size(), addr, 16);
+        if (ec != std::errc()) {
+            throw std::runtime_error("Invalid hex address: " + token);
+        }
+        return addr;
+    };
 
     // Convert to uppercase for case-insensitive comparison
     std::transform(command.begin(), command.end(), command.begin(), ::toupper);
 
     if (command == "PRINT") {
-        // Format options:
-        // PRINT "message"
-        // PRINT variable "message"
-
         std::string remaining;
         std::getline(iss, remaining);
 
@@ -420,42 +463,56 @@ std::shared_ptr<Instruction> InstructionFactory::parseInstructionString(
         remaining.erase(remaining.begin(), std::find_if(remaining.begin(), remaining.end(),
                                                         [](unsigned char ch) { return !std::isspace(ch); }));
 
-        if (remaining.empty()) {
-            throw std::runtime_error("PRINT instruction requires a message or variable");
+        if (remaining.empty() || remaining.front() != '(' || remaining.back() != ')') {
+            throw std::runtime_error("PRINT expression must be in the format: PRINT(\"text\" [+ var])");
         }
 
-        // Check if it starts with a quote (simple message)
-        if (remaining.front() == '"') {
-            // Extract quoted message
-            size_t endQuote = remaining.find('"', 1);
-            if (endQuote == std::string::npos) {
-                throw std::runtime_error("Unterminated quote in PRINT instruction");
+        std::string expr = remaining.substr(1, remaining.size() - 2);  // remove parentheses
+
+        // Find optional '+' for concatenation
+        auto plusPos = expr.find('+');
+        if (plusPos == std::string::npos) {
+            // No '+', treat entire thing as message OR variable
+            expr.erase(expr.begin(),
+                       std::find_if(expr.begin(), expr.end(), [](unsigned char ch) { return !std::isspace(ch); }));
+            expr.erase(
+                std::find_if(expr.rbegin(), expr.rend(), [](unsigned char ch) { return !std::isspace(ch); }).base(),
+                expr.end());
+
+            if (expr.front() == '"' && expr.back() == '"') {
+                std::string literal = expr.substr(1, expr.size() - 2);
+                return std::make_shared<PrintInstruction>(literal, processID);  // Just a string literal
+            } else {
+                return std::make_shared<PrintInstruction>("", processID, expr);  // Just a variable
             }
-            std::string message = remaining.substr(1, endQuote - 1);
-            return std::make_shared<PrintInstruction>(message, processID);
-        }
-        // Look for variable followed by quoted message
-        std::istringstream remainingStream(remaining);
-        std::string variable, quotedMessage;
-        remainingStream >> variable;
-
-        std::getline(remainingStream, quotedMessage);
-        quotedMessage.erase(quotedMessage.begin(), std::find_if(quotedMessage.begin(), quotedMessage.end(),
-                                                                [](unsigned char ch) { return !std::isspace(ch); }));
-
-        if (quotedMessage.empty() || quotedMessage.front() != '"') {
-            // Just a variable name print
-            return std::make_shared<PrintInstruction>("", processID, variable);
         } else {
-            // Variable and message
-            size_t endQuote = quotedMessage.find('"', 1);
-            if (endQuote == std::string::npos) {
-                throw std::runtime_error("Unterminated quote in PRINT instruction");
+            // There is a '+' -> string + variable
+            std::string left = expr.substr(0, plusPos);
+            std::string right = expr.substr(plusPos + 1);
+
+            // Trim
+            left.erase(left.begin(),
+                       std::find_if(left.begin(), left.end(), [](unsigned char ch) { return !std::isspace(ch); }));
+            left.erase(
+                std::find_if(left.rbegin(), left.rend(), [](unsigned char ch) { return !std::isspace(ch); }).base(),
+                left.end());
+
+            right.erase(right.begin(),
+                        std::find_if(right.begin(), right.end(), [](unsigned char ch) { return !std::isspace(ch); }));
+            right.erase(
+                std::find_if(right.rbegin(), right.rend(), [](unsigned char ch) { return !std::isspace(ch); }).base(),
+                right.end());
+
+            if (!(left.front() == '"' && left.back() == '"')) {
+                throw std::runtime_error("Left side of '+' in PRINT must be a quoted string");
             }
-            std::string message = quotedMessage.substr(1, endQuote - 1);
-            return std::make_shared<PrintInstruction>(message, processID, variable);
+
+            std::string literal = left.substr(1, left.size() - 2);
+            std::string varName = right;
+            return std::make_shared<PrintInstruction>(literal, processID, varName);
         }
     }
+
     if (command == "DECLARE") {
         // Format: DECLARE variable value
         std::string variable;
@@ -511,35 +568,46 @@ std::shared_ptr<Instruction> InstructionFactory::parseInstructionString(
     }
     if (command == "WRITE") {
         // Format: WRITE address value
-        int addr;
-        uint16_t value;
-        iss >> addr >> value;
+        std::string addrToken, valueToken;
+        iss >> addrToken >> valueToken;
 
-        if (iss.fail()) {
+        if (addrToken.empty() || valueToken.empty()) {
             throw std::runtime_error("WRITE instruction requires address and value");
         }
 
-        return std::make_shared<WriteInstruction>(addr, value, processID);
+        // Parse address as hex
+        int addr = parseHexAddress(addrToken);
+
+        // Parse valueToken as either literal or variable
+        uint16_t literalValue;
+        auto [vptr, vec] = std::from_chars(valueToken.data(), valueToken.data() + valueToken.size(), literalValue);
+        if (vec == std::errc()) {
+            return std::make_shared<WriteInstruction>(addr, literalValue, processID);
+        }
+
+        return std::make_shared<WriteInstruction>(addr, valueToken, processID);
     }
+
     if (command == "READ") {
         // Format: READ variable address
-        std::string variable;
-        int addr;
-        iss >> variable >> addr;
+        std::string variable, addrToken;
+        iss >> variable >> addrToken;
 
-        if (variable.empty() || iss.fail()) {
+        if (variable.empty() || addrToken.empty()) {
             throw std::runtime_error("READ instruction requires variable name and address");
         }
 
+        int addr = parseHexAddress(addrToken);
+
         return std::make_shared<ReadInstruction>(variable, addr, processID);
-    } else if (command == "FOR") {
+    }
+    if (command == "FOR") {
         // FOR loops are complex and typically not single-line
         // This is a simplified version - you might want to handle this differently
         throw std::runtime_error("FOR loops are not supported in single-line instruction format. Use separate "
                                  "instruction files for complex control structures.");
-    } else {
-        throw std::runtime_error("Unknown instruction: " + command);
     }
+    throw std::runtime_error("Unknown instruction: " + command);
 }
 
 // Note: You'll need to add this method declaration to your InstructionFactory.h:

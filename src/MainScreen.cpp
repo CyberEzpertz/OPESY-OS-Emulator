@@ -214,13 +214,16 @@ void MainScreen::handleScreenCommand(const std::vector<std::string>& tokens) {
         // This handles cases where the instruction string might have been split by spaces
         std::string instrStr;
         for (size_t i = 4; i < tokens.size(); ++i) {
-            if (i > 4) instrStr += " ";
+            if (i > 4)
+                instrStr += " ";
             instrStr += tokens[i];
         }
 
         // Remove surrounding quotes if present
         if (instrStr.size() >= 2 && instrStr.front() == '"' && instrStr.back() == '"') {
-            instrStr = instrStr.substr(1, instrStr.size() - 2);
+            std::istringstream iss(instrStr);
+            std::string result;
+            iss >> std::quoted(instrStr);
         }
 
         if (instrStr.empty()) {
@@ -230,7 +233,6 @@ void MainScreen::handleScreenCommand(const std::vector<std::string>& tokens) {
 
         // Create the process with custom instructions
         if (console.createProcessWithCustomInstructions(processName, memSize, instrStr)) {
-            // Optionally switch to the newly created process
             console.switchConsole(processName);
         }
 

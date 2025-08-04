@@ -192,7 +192,7 @@ void ProcessScheduler::printQueues() const {
 
 void ProcessScheduler::tickLoop() {
     while (running) {
-        std::this_thread::sleep_for(1ms);  // Simulate one tick every 1ms
+        // std::this_thread::sleep_for(1ms);  // Simulate one tick every 1ms
         tickBarrier->arrive_and_wait();
     }
     tickBarrier->arrive_and_drop();
