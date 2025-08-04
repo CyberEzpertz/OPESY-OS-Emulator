@@ -1,6 +1,7 @@
 #include "ArithmeticInstruction.h"
 
 #include "Process.h"
+#include <format>
 
 ArithmeticInstruction::ArithmeticInstruction(const std::string& resultName, const Operand& lhsVar,
                                              const Operand& rhsVar, const Operation& operation, const int pid)
