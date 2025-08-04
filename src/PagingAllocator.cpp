@@ -349,17 +349,10 @@ void PagingAllocator::swapOut(const int frameIndex) {
     this->numPagedOut += 1;
     freeFrame(frameIndex);
 }
-
 std::vector<std::optional<StoredData>> PagingAllocator::swapIn(int pid, int pageNumber) const {
     std::ifstream backingFile(BACKING_STORE_FILE);
-    std::ofstream tempFile("temp.txt");
-
-    if (!backingFile.is_open()) {
+    if (!backingFile.is_open())
         throw std::runtime_error("Failed to open backing store file.");
-    }
-    if (!tempFile.is_open()) {
-        throw std::runtime_error("Failed to open temporary backing store file.");
-    }
 
     std::vector<std::optional<StoredData>> storedData(Config::getInstance().getMemPerFrame(), std::nullopt);
     std::string line;
@@ -370,71 +363,56 @@ std::vector<std::optional<StoredData>> PagingAllocator::swapIn(int pid, int page
         int readPID, readPage;
 
         if ((iss >> readPID >> readPage)) {
-            if (inTargetBlock) {
-                tempFile << line << "\n";
-                inTargetBlock = false;
-                continue;
-            }
-
-            if (readPID == pid && readPage == pageNumber) {
-                inTargetBlock = true;
-                continue;
-            }
+            inTargetBlock = (readPID == pid && readPage == pageNumber);
+            continue;
         }
 
-        if (inTargetBlock) {
-            if (line.starts_with("VAL")) {
-                std::string tag;
-                int offset;
-                uint16_t value;
-                size_t xIndex = line.find(" x");
+        if (!inTargetBlock)
+            continue;
 
-                int count = 1;
-                if (xIndex != std::string::npos) {
-                    std::string prefix = line.substr(0, xIndex);
-                    std::string suffix = line.substr(xIndex + 2);
-                    std::istringstream(prefix) >> tag >> offset >> value;
-                    count = std::stoi(suffix);
-                } else {
-                    iss.clear();
-                    iss.str(line);
-                    iss >> tag >> offset >> value;
-                }
+        if (line.starts_with("VAL")) {
+            std::string tag;
+            int offset;
+            uint16_t value;
+            size_t xIndex = line.find(" x");
 
-                for (int i = 0; i < count; ++i) {
-                    int addr = offset + (i * 2);
-                    if (addr + 1 < static_cast<int>(storedData.size())) {
-                        auto high = static_cast<uint8_t>((value >> 8) & 0xFF);
-                        auto low = static_cast<uint8_t>(value & 0xFF);
-                        storedData[addr] = static_cast<uint16_t>(high);
-                        storedData[addr + 1] = static_cast<uint16_t>(low);
-                    }
-                }
-            } else if (line.starts_with("INS")) {
-                std::string tag;
-                int offset;
+            int count = 1;
+            if (xIndex != std::string::npos) {
+                std::string prefix = line.substr(0, xIndex);
+                std::string suffix = line.substr(xIndex + 2);
+                std::istringstream(prefix) >> tag >> offset >> value;
+                count = std::stoi(suffix);
+            } else {
                 iss.clear();
                 iss.str(line);
-                iss >> tag >> offset;
+                iss >> tag >> offset >> value;
+            }
 
-                std::string serializedInstr = line.substr(line.find_first_of(" \t", 4) + 1);
-                std::istringstream instrStream(serializedInstr);
-                auto instr = InstructionFactory::deserializeInstruction(instrStream);
-
-                if (offset >= 0 && offset < static_cast<int>(storedData.size())) {
-                    storedData[offset] = instr;
+            for (int i = 0; i < count; ++i) {
+                int addr = offset + (i * 2);
+                if (addr + 1 < static_cast<int>(storedData.size())) {
+                    auto high = static_cast<uint8_t>((value >> 8) & 0xFF);
+                    auto low = static_cast<uint8_t>(value & 0xFF);
+                    storedData[addr] = static_cast<uint16_t>(high);
+                    storedData[addr + 1] = static_cast<uint16_t>(low);
                 }
             }
-        } else {
-            tempFile << line << "\n";
+        } else if (line.starts_with("INS")) {
+            std::string tag;
+            int offset;
+            iss.clear();
+            iss.str(line);
+            iss >> tag >> offset;
+
+            std::string serializedInstr = line.substr(line.find_first_of(" \t", 4) + 1);
+            std::istringstream instrStream(serializedInstr);
+            auto instr = InstructionFactory::deserializeInstruction(instrStream);
+
+            if (offset >= 0 && offset < static_cast<int>(storedData.size())) {
+                storedData[offset] = instr;
+            }
         }
     }
-
-    backingFile.close();
-    tempFile.close();
-
-    std::remove(BACKING_STORE_FILE);
-    std::rename("temp.txt", BACKING_STORE_FILE);
 
     return storedData;
 }

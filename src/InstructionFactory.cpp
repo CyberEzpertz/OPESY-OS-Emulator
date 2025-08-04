@@ -68,7 +68,7 @@ std::vector<std::shared_ptr<Instruction>> InstructionFactory::generateInstructio
     const int startMemory = randMaxLines * INSTRUCTION_SIZE + SYMBOL_TABLE_SIZE;
 
     // Leave a chance of error for the READ/WRITEs
-    constexpr double errorChance = 0.1;
+    constexpr double errorChance = 0.01;
     const int errorMemory = requiredMemory * errorChance;
     const int endMemory = startMemory + requiredMemory - SYMBOL_TABLE_SIZE + errorMemory;
 
@@ -283,7 +283,7 @@ std::shared_ptr<Instruction> InstructionFactory::deserializeInstruction(std::ist
     std::string type;
     is >> type;
 
-    if (type == "PRINT") {
+    if (type == "PRT") {
         int pid;
         bool hasVar;
         std::optional<std::string> varName = std::nullopt;
@@ -305,23 +305,23 @@ std::shared_ptr<Instruction> InstructionFactory::deserializeInstruction(std::ist
 
         return std::make_shared<PrintInstruction>(message, pid);
     }
-    if (type == "DECLARE") {
+    if (type == "DCL") {
         std::string var;
         uint16_t value;
         int pid;
         is >> var >> value >> pid;
         return std::make_shared<DeclareInstruction>(var, value, pid);
     }
-    if (type == "SLEEP") {
+    if (type == "SLP") {
         int duration, pid;
         is >> duration >> pid;
         return std::make_shared<SleepInstruction>(duration, pid);
     }
 
-    if (type == "ARITH") {
+    if (type == "ADD") {
         std::string resultName, lhsStr, rhsStr;
-        int opInt, pid;
-        is >> resultName >> lhsStr >> rhsStr >> opInt >> pid;
+        int pid;
+        is >> resultName >> lhsStr >> rhsStr >> pid;
 
         auto parseOperand = [](const std::string& token) -> Operand {
             try {
@@ -335,17 +335,35 @@ std::shared_ptr<Instruction> InstructionFactory::deserializeInstruction(std::ist
 
         Operand lhs = parseOperand(lhsStr);
         Operand rhs = parseOperand(rhsStr);
-        auto op = static_cast<Operation>(opInt);
 
-        return std::make_shared<ArithmeticInstruction>(resultName, lhs, rhs, op, pid);
+        return std::make_shared<ArithmeticInstruction>(resultName, lhs, rhs, ADD, pid);
     }
 
-    if (type == "WRITE") {
+    if (type == "SUB") {
+        std::string resultName, lhsStr, rhsStr;
+        int pid;
+        is >> resultName >> lhsStr >> rhsStr >> pid;
+
+        auto parseOperand = [](const std::string& token) -> Operand {
+            try {
+                // Try to parse as uint16_t
+                return static_cast<uint16_t>(std::stoul(token));
+            } catch (...) {
+                // Otherwise treat as string (e.g. variable name)
+                return token;
+            }
+        };
+
+        Operand lhs = parseOperand(lhsStr);
+        Operand rhs = parseOperand(rhsStr);
+
+        return std::make_shared<ArithmeticInstruction>(resultName, lhs, rhs, SUBTRACT, pid);
+    }
+
+    if (type == "W") {
         std::string hasVar;
         std::string addrVal, pidVal;
         is >> hasVar >> addrVal;
-
-        // std::println("{} {}", hasVar, addrVal);
 
         auto addr = std::stoi(addrVal);
 
@@ -353,17 +371,15 @@ std::shared_ptr<Instruction> InstructionFactory::deserializeInstruction(std::ist
             std::string var;
             is >> var >> pidVal;
             auto pid = std::stoi(pidVal);
-            // std::println("{} {}", hasVar, pidVal);
             return std::make_shared<WriteInstruction>(addr, var, pid);
         }
 
         uint16_t val;
         is >> val >> pidVal;
         auto pid = std::stoi(pidVal);
-        // std::println("{} {}", hasVar, pidVal);
         return std::make_shared<WriteInstruction>(addr, val, pid);
     }
-    if (type == "READ") {
+    if (type == "R") {
         std::string var;
         int addr, pid;
         is >> var >> addr >> pid;

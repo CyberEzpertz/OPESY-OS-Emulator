@@ -13,5 +13,5 @@ void DeclareInstruction::execute() {
 }
 
 std::string DeclareInstruction::serialize() const {
-    return std::format("DECLARE {} {} {}", name, value, pid);
+    return std::format("DCL {} {} {}", name, value, pid);
 }

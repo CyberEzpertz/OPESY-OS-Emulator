@@ -467,15 +467,7 @@ void MainScreen::generateProcessSMI() {
         std::print("Core {:<2}:  ", coreIndex);
         resetColor();
 
-        std::print("{:<12} {:<8} ", process->getName(), process->getMemoryUsage());
-
-        if (process->getStatus() == RUNNING) {
-            setColor(32);  // Green
-            std::println("RUNNING");
-        } else {
-            setColor(33);  // Yellow
-            std::println("OTHER");
-        }
+        std::println("{:<12} {:>8}B ", process->getName(), process->getMemoryUsage());
 
         resetColor();
         seenProcessIds.insert(process->getID());
@@ -511,7 +503,7 @@ void MainScreen::generateProcessSMI() {
         }
 
         resetColor();
-        std::println("{:<12} {:<8}B", process->getName(), process->getMemoryUsage());
+        std::println("{:<12} {:>8}B", process->getName(), process->getMemoryUsage());
     }
 
     setColor(2);  // Dim
