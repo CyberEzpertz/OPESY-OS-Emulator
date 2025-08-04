@@ -233,7 +233,6 @@ void MainScreen::handleScreenCommand(const std::vector<std::string>& tokens) {
 
         // Create the process with custom instructions
         if (console.createProcessWithCustomInstructions(processName, memSize, instrStr)) {
-            // Optionally switch to the newly created process
             console.switchConsole(processName);
         }
 

@@ -9,7 +9,7 @@ DeclareInstruction::DeclareInstruction(const std::string& name, const uint16_t v
 
 void DeclareInstruction::execute() {
     const auto proc = getProcess();
-    proc->setVariable(name, value);
+    proc->declareVariable(name, value);
 }
 
 std::string DeclareInstruction::serialize() const {
