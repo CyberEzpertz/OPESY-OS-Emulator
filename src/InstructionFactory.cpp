@@ -479,7 +479,7 @@ std::shared_ptr<Instruction> InstructionFactory::parseInstructionString(
 
         return std::make_shared<SleepInstruction>(duration, processID);
     }
-    if (command == "ADD" || command == "SUB" || command == "MUL" || command == "DIV") {
+    if (command == "ADD" || command == "SUB") {
         // Format: ADD result lhs rhs
         std::string resultName, lhsStr, rhsStr;
         iss >> resultName >> lhsStr >> rhsStr;
