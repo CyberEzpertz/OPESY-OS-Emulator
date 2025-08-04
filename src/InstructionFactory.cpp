@@ -183,9 +183,16 @@ std::shared_ptr<Instruction> InstructionFactory::createRandomInstruction(const i
             return std::make_shared<ArithmeticInstruction>(result, lhs, rhs, Operation::SUBTRACT, pid);
         }
         case 5: {  // WRITE(address, value)
+            bool hasVar = generateRandomNum(0, 1) % 2 == 1;
             int address = generateRandomNum(startMemory, endMemory - 2);
-            uint16_t value = getRandomUint16();
-            return std::make_shared<WriteInstruction>(address, value, pid);
+
+            if (hasVar) {
+                uint16_t value = getRandomUint16();
+                return std::make_shared<WriteInstruction>(address, value, pid);
+            }
+
+            auto varName = getRandomVarName(declaredVars);
+            return std::make_shared<WriteInstruction>(address, varName, pid);
         }
         case 6: {  // READ(var, address)
             std::string result = getRandomVarName(declaredVars);
@@ -333,9 +340,18 @@ std::shared_ptr<Instruction> InstructionFactory::deserializeInstruction(std::ist
     }
 
     if (type == "WRITE") {
+        bool hasVar;
         int addr, pid;
+        is >> hasVar >> addr;
+
+        if (hasVar) {
+            std::string var;
+            is >> var >> pid;
+            return std::make_shared<WriteInstruction>(addr, var, pid);
+        }
+
         uint16_t val;
-        is >> addr >> val >> pid;
+        is >> val >> pid;
         return std::make_shared<WriteInstruction>(addr, val, pid);
     }
     if (type == "READ") {
@@ -381,7 +397,6 @@ std::shared_ptr<Instruction> InstructionFactory::deserializeInstruction(std::ist
 
 std::vector<std::shared_ptr<Instruction>> InstructionFactory::createInstructionsFromStrings(
     const std::vector<std::string>& instructionStrings, int processID) {
-
     std::vector<std::shared_ptr<Instruction>> instructions;
     instructions.reserve(instructionStrings.size());
 
@@ -398,9 +413,7 @@ std::vector<std::shared_ptr<Instruction>> InstructionFactory::createInstructions
     return instructions;
 }
 
-std::shared_ptr<Instruction> InstructionFactory::parseInstructionString(
-    const std::string& instrStr, int processID) {
-
+std::shared_ptr<Instruction> InstructionFactory::parseInstructionString(const std::string& instrStr, int processID) {
     std::istringstream iss(instrStr);
     std::string command;
     iss >> command;
