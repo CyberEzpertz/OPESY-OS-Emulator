@@ -26,15 +26,17 @@ ProcessScreen::ProcessScreen(std::shared_ptr<Process> process)
 /// and a list of logged messages. Also displays navigation instructions
 /// for the user.
 void ProcessScreen::render() {
-    std::println(
-        "\n\033[35;1m========== Process Information ==========\033[0m");
+    std::println("\n\033[35;1m========== Process Information ==========\033[0m");
 
     std::println("\033[1m{:>20}:\033[0m {}", "ID", processPtr->getID());
     std::println("\033[1m{:>20}:\033[0m {}", "Name", processPtr->getName());
-    std::println("\033[1m{:>20}:\033[0m {}", "Timestamp",
-                 processPtr->getTimestamp());
-    std::println("\033[1m{:>20}:\033[0m {}/{}", "Instruction Line",
-                 processPtr->getCurrentLine(), processPtr->getTotalLines());
+    std::println("\033[1m{:>20}:\033[0m {}", "Timestamp", processPtr->getTimestamp());
+    std::println("\033[1m{:>20}:\033[0m {}/{}", "Instruction Line", processPtr->getCurrentLine(), processPtr->getTotalLines());
+
+    // Show memory violation if shutdown occurred
+    if (processPtr->isShutdown()) {
+        std::println("\n\033[31;1m[!]\033[0m \033[1mMemory Violation:\033[0m {}", processPtr->getShutdownReason());
+    }
 
     std::println("\n\033[32;1m------------- Logs -------------\033[0m");
 
@@ -54,6 +56,7 @@ void ProcessScreen::render() {
                  "the main menu or '\033[1mprocess-smi\033[0m\033[36m' to "
                  "refresh process information]\033[0m");
 }
+
 
 /// @brief Handles user input specific to the ProcessScreen context.
 ///
