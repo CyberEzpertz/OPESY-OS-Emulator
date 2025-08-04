@@ -415,17 +415,22 @@ std::vector<std::shared_ptr<Instruction>> InstructionFactory::createInstructions
 
 std::shared_ptr<Instruction> InstructionFactory::parseInstructionString(const std::string& instrStr, int processID) {
     std::istringstream iss(instrStr);
+
     std::string command;
-    iss >> command;
+    char ch;
+    while (iss.get(ch)) {
+        if (std::isalnum(ch) || ch == '_') {
+            command += ch;
+        } else {
+            iss.unget();  // Put back non-word character
+            break;
+        }
+    }
 
     // Convert to uppercase for case-insensitive comparison
     std::transform(command.begin(), command.end(), command.begin(), ::toupper);
 
     if (command == "PRINT") {
-        // Format options:
-        // PRINT "message"
-        // PRINT variable "message"
-
         std::string remaining;
         std::getline(iss, remaining);
 
@@ -433,41 +438,13 @@ std::shared_ptr<Instruction> InstructionFactory::parseInstructionString(const st
         remaining.erase(remaining.begin(), std::find_if(remaining.begin(), remaining.end(),
                                                         [](unsigned char ch) { return !std::isspace(ch); }));
 
-        if (remaining.empty()) {
-            throw std::runtime_error("PRINT instruction requires a message or variable");
+        // Expecting: (....)
+        if (remaining.empty() || remaining.front() != '(' || remaining.back() != ')') {
+            throw std::runtime_error("PRINT expression must be in the format: PRINT(\"text\" [+ var])");
         }
 
-        // Check if it starts with a quote (simple message)
-        if (remaining.front() == '"') {
-            // Extract quoted message
-            size_t endQuote = remaining.find('"', 1);
-            if (endQuote == std::string::npos) {
-                throw std::runtime_error("Unterminated quote in PRINT instruction");
-            }
-            std::string message = remaining.substr(1, endQuote - 1);
-            return std::make_shared<PrintInstruction>(message, processID);
-        }
-        // Look for variable followed by quoted message
-        std::istringstream remainingStream(remaining);
-        std::string variable, quotedMessage;
-        remainingStream >> variable;
-
-        std::getline(remainingStream, quotedMessage);
-        quotedMessage.erase(quotedMessage.begin(), std::find_if(quotedMessage.begin(), quotedMessage.end(),
-                                                                [](unsigned char ch) { return !std::isspace(ch); }));
-
-        if (quotedMessage.empty() || quotedMessage.front() != '"') {
-            // Just a variable name print
-            return std::make_shared<PrintInstruction>("", processID, variable);
-        } else {
-            // Variable and message
-            size_t endQuote = quotedMessage.find('"', 1);
-            if (endQuote == std::string::npos) {
-                throw std::runtime_error("Unterminated quote in PRINT instruction");
-            }
-            std::string message = quotedMessage.substr(1, endQuote - 1);
-            return std::make_shared<PrintInstruction>(message, processID, variable);
-        }
+        std::string expression = remaining.substr(1, remaining.size() - 2);  // remove parentheses
+        return std::make_shared<PrintInstruction>(expression, processID);
     }
     if (command == "DECLARE") {
         // Format: DECLARE variable value
@@ -525,14 +502,23 @@ std::shared_ptr<Instruction> InstructionFactory::parseInstructionString(const st
     if (command == "WRITE") {
         // Format: WRITE address value
         int addr;
-        uint16_t value;
-        iss >> addr >> value;
+        std::string valueToken;
+        iss >> addr >> valueToken;
 
         if (iss.fail()) {
             throw std::runtime_error("WRITE instruction requires address and value");
         }
 
-        return std::make_shared<WriteInstruction>(addr, value, processID);
+        // Try to parse valueToken as integer
+        uint16_t literalValue;
+        auto [ptr, ec] = std::from_chars(valueToken.data(), valueToken.data() + valueToken.size(), literalValue);
+
+        if (ec == std::errc()) {
+            // Parsed successfully as a literal
+            return std::make_shared<WriteInstruction>(addr, literalValue, processID);
+        }
+        // Treat as variable name
+        return std::make_shared<WriteInstruction>(addr, valueToken, processID);
     }
     if (command == "READ") {
         // Format: READ variable address

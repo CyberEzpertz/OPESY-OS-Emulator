@@ -23,5 +23,6 @@ void WriteInstruction::execute() {
 }
 
 std::string WriteInstruction::serialize() const {
-    return std::format("WRITE {} {} {} {}", hasVar, address, hasVar ? varName : value, pid);
+    std::string valueStr = hasVar ? varName : std::to_string(value);
+    return std::format("WRITE {} {} {} {}", hasVar, address, valueStr, pid);
 }
