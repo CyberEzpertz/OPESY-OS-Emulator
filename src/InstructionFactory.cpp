@@ -67,7 +67,7 @@ std::vector<std::shared_ptr<Instruction>> InstructionFactory::generateInstructio
     const int startMemory = randMaxLines * INSTRUCTION_SIZE + SYMBOL_TABLE_SIZE;
 
     // Leave a chance of error for the READ/WRITEs
-    constexpr double errorChance = 0.01;
+    constexpr double errorChance = 0.1;
     const int errorMemory = requiredMemory * errorChance;
     const int endMemory = startMemory + requiredMemory - SYMBOL_TABLE_SIZE + errorMemory;
 

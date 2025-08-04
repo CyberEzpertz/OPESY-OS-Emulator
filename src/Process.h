@@ -126,6 +126,8 @@ public:
     uint16_t readFromHeap(int address);
     std::uint64_t getMemoryUsage() const;
     void precomputeInstructionPages();
+    bool isShutdown() const { return didShutdown; }
+    std::string getShutdownReason() const { return shutdownDetails; }
 
 private:
     int processID;                  ///< Unique identifier for the process.
