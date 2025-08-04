@@ -50,17 +50,26 @@ ConsoleManager& ConsoleManager::getInstance() {
 ///
 /// Logs an error message if the screen name is not found.
 void ConsoleManager::switchConsole(const std::string& processName) {
-    if (processNameMap.contains(processName)) {
-        if (processNameMap[processName]->getStatus() == ProcessStatus::DONE) {
-            std::println("Process {} not found.", processName);
-        } else {
-            currentScreen = std::make_shared<ProcessScreen>(processNameMap[processName]);
-            clearConsole();
-            currentScreen->render();
-        }
-    } else {
+    if (!processNameMap.contains(processName)) {
         std::println("Error: No process named {} was found.", processName);
+        return;
     }
+
+    auto process = processNameMap[processName];
+
+    if (process->getStatus() == ProcessStatus::DONE) {
+        if (process->isShutdown()) {
+            std::println("{}", process->getShutdownReason());
+        } else {
+            std::println("Process {} not found.", processName);
+        }
+        return;
+    }
+
+    // Otherwise allow access
+    currentScreen = std::make_shared<ProcessScreen>(process);
+    clearConsole();
+    currentScreen->render();
 }
 
 /// Helper function to check if a number is a power of 2

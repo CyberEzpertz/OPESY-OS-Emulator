@@ -322,11 +322,21 @@ void Process::swapPageIn(const int pageNumber, const int frameNumber) {
 
 void Process::shutdown(int invalidAddress) {
     didShutdown = true;
-    shutdownDetails =
-        std::format("Process {} shut down due to memory access violation error that occurred at {}. {:x} invalid.",
-                    processName, getTimestamp(), invalidAddress);
+
+    // Extract only the HH:MM:SS part from timestamp
+    std::string timeOnly = getTimestamp();
+    auto commaPos = timeOnly.find(',');
+    if (commaPos != std::string::npos) {
+        timeOnly = timeOnly.substr(commaPos + 2);  // Skip ", "
+    }
+
+    shutdownDetails = std::format(
+        "Process {} shut down due to memory access violation error that occurred at {}. 0x{:X} invalid.",
+        processName, timeOnly, invalidAddress);
+
     status = DONE;
 }
+
 
 std::pair<int, int> Process::splitAddress(const int address) {
     const int pageSize = Config::getInstance().getMemPerFrame();
