@@ -6,6 +6,7 @@
 #include <shared_mutex>
 #include <variant>
 #include <vector>
+#include <optional>
 
 class Instruction;
 class Process;

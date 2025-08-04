@@ -192,6 +192,51 @@ void MainScreen::handleScreenCommand(const std::vector<std::string>& tokens) {
         return;
     }
 
+    if (flag == "-c") {
+        if (tokens.size() < 5) {
+            std::println("Error: screen -c requires <name> <mem_size> \"<instructions>\"");
+            std::println("Usage: screen -c <name> <mem_size> \"<instrs;separated;by;semicolons>\"");
+            return;
+        }
+
+        const std::string& processName = tokens[2];
+
+        // Parse memory size
+        int memSize;
+        try {
+            memSize = std::stoi(tokens[3]);
+        } catch (const std::exception& e) {
+            std::println("Error: Invalid memory size '{}'. Must be a number.", tokens[3]);
+            return;
+        }
+
+        // Reconstruct instruction string from remaining tokens
+        // This handles cases where the instruction string might have been split by spaces
+        std::string instrStr;
+        for (size_t i = 4; i < tokens.size(); ++i) {
+            if (i > 4) instrStr += " ";
+            instrStr += tokens[i];
+        }
+
+        // Remove surrounding quotes if present
+        if (instrStr.size() >= 2 && instrStr.front() == '"' && instrStr.back() == '"') {
+            instrStr = instrStr.substr(1, instrStr.size() - 2);
+        }
+
+        if (instrStr.empty()) {
+            std::println("Error: No instructions provided.");
+            return;
+        }
+
+        // Create the process with custom instructions
+        if (console.createProcessWithCustomInstructions(processName, memSize, instrStr)) {
+            // Optionally switch to the newly created process
+            console.switchConsole(processName);
+        }
+
+        return;
+    }
+
     // If the flag is not recognized
     std::println("Invalid screen flag: {}", flag);
 }
