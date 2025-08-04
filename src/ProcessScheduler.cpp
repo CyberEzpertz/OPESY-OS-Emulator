@@ -177,7 +177,9 @@ void ProcessScheduler::dummyGeneratorLoop() {
         int id = ConsoleManager::getInstance().getProcessIdList().size();
         std::string name = std::format("process_{:02d}", id);
 
-        ConsoleManager::getInstance().createDummyProcess(name);
+        auto newProcess = ConsoleManager::getInstance().createDummyProcess(name);
+        if (newProcess)
+            scheduleProcess(newProcess);
     }
 }
 
@@ -192,7 +194,7 @@ void ProcessScheduler::printQueues() const {
 
 void ProcessScheduler::tickLoop() {
     while (running) {
-        // std::this_thread::sleep_for(1ms);  // Simulate one tick every 1ms
+        std::this_thread::sleep_for(1ms);  // Simulate one tick every 1ms
         tickBarrier->arrive_and_wait();
     }
     tickBarrier->arrive_and_drop();

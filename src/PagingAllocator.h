@@ -3,10 +3,10 @@
 #include <atomic>
 #include <deque>
 #include <memory>
+#include <optional>
 #include <shared_mutex>
 #include <variant>
 #include <vector>
-#include <optional>
 
 class Instruction;
 class Process;
@@ -59,7 +59,7 @@ private:
     void freeFrame(int frameIndex);
 
     void swapOut(int frameIndex);
-    std::vector<std::optional<StoredData>> swapIn(int pid, int pageNumber) const;
+    std::vector<std::optional<StoredData>> swapIn(std::shared_ptr<Process> process, int pageNumber) const;
 
     size_t totalFrames;
     std::atomic<size_t> allocatedFrames = 0;

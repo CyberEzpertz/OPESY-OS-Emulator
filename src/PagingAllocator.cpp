@@ -27,14 +27,18 @@ PageFaultResult PagingAllocator::handlePageFault(const int pid, const int pageNu
     constexpr int maxAttempts = 10;
     int attempts = 0;
 
-    auto process = ConsoleManager::getInstance().getProcessByPID(pid);
+    const auto process = ConsoleManager::getInstance().getProcessByPID(pid);
+
+    if (!process) {
+        throw new std::runtime_error("Tried to handle page fault of non-existent process.");
+    }
 
     // Load page data only once
     std::vector<std::optional<StoredData>> pageData;
     {
         std::lock_guard lock(pagingMutex);
         const PageEntry entry = process->getPageEntry(pageNumber);
-        pageData = entry.inBackingStore ? swapIn(pid, pageNumber) : process->getPageData(pageNumber);
+        pageData = entry.inBackingStore ? swapIn(process, pageNumber) : process->getPageData(pageNumber);
     }
 
     while (true) {
@@ -172,25 +176,38 @@ bool PagingAllocator::pinFrame(const int frameNumber, const int pid, const int p
 }
 
 StoredData PagingAllocator::readFromFrame(const int frameNumber, const int offset) {
+    if (frameNumber < 0 || frameNumber >= static_cast<int>(frameTable.size()))
+        throw new std::runtime_error("Invalid frame number");
+
+    if (offset < 0 || offset + 1 >= static_cast<int>(frameTable[frameNumber].data.size()))
+        throw new std::runtime_error("Invalid offset");
+
     std::lock_guard lock(pagingMutex);
     const auto data = frameTable[frameNumber].data[offset];
 
-    if (data.has_value()) {
-        frameTable[frameNumber].isPinned = false;
-        if (std::holds_alternative<uint16_t>(data.value())) {
-            auto valOpt = readUint16FromFrame(frameNumber, offset);
-
-            if (valOpt) {
-                return {*valOpt};
-            }
-        }
-
-        return data.value();
+    if (!data.has_value()) {
+        throw std::runtime_error("Tried accessing 2nd byte - Possible misaligned address");
     }
 
-    throw std::runtime_error("Tried accessing 2nd byte - Possible misaligned address");
+    frameTable[frameNumber].isPinned = false;
+    if (std::holds_alternative<uint16_t>(data.value())) {
+        auto valOpt = readUint16FromFrame(frameNumber, offset);
+
+        if (valOpt) {
+            return {*valOpt};
+        }
+    }
+
+    return data.value();
 }
+
 void PagingAllocator::writeToFrame(const int frameNumber, const int offset, const uint16_t data) {
+    if (frameNumber < 0 || frameNumber >= static_cast<int>(frameTable.size()))
+        throw new std::runtime_error("Invalid frame number");
+
+    if (offset < 0 || offset + 1 >= static_cast<int>(frameTable[frameNumber].data.size()))
+        throw new std::runtime_error("Invalid offset");
+
     std::lock_guard lock(pagingMutex);
     frameTable[frameNumber].isPinned = false;
 
@@ -240,19 +257,6 @@ bool PagingAllocator::evictVictimFrame() {
     if (victimFrame == -1)
         return false;
 
-    auto& [victimPID, victimPageNum, _, _pinned] = frameTable[victimFrame];
-
-    // Update victim's page table
-    const auto victimProcess = ConsoleManager::getInstance().getProcessByPID(victimPID);
-
-    if (victimProcess) {
-        victimProcess->swapPageOut(victimPageNum);
-    } else {
-        const auto error = std::format("Tried swapping out invalid process with PID {}", victimPID);
-        throw std::runtime_error(error);
-    }
-
-    // Write frame to backing store
     swapOut(victimFrame);
 
     return true;
@@ -286,13 +290,24 @@ void PagingAllocator::freeFrame(const int frameIndex) {
 
 void PagingAllocator::swapOut(const int frameIndex) {
     if (frameIndex < 0 || frameIndex >= static_cast<int>(frameTable.size())) {
-        throw std::out_of_range("Invalid frame index for swapOut.");
+        throw new std::runtime_error("Invalid frame index for swapOut.");
     }
 
-    const auto& [pid, pageNumber, _, _pinned] = frameTable[frameIndex];
+    const auto& [pid, pageNumber, data, _pinned] = frameTable[frameIndex];
     const auto process = ConsoleManager::getInstance().getProcessByPID(pid);
+
     if (!process) {
         throw std::runtime_error("Process not found during swapOut.");
+    }
+
+    // swapPageOut returns whether the page is dirtied
+    auto isDirty = process->swapPageOut(pageNumber);
+
+    // We only write to backing store if it was dirtied
+    if (!isDirty) {
+        freeFrame(frameIndex);
+        this->numPagedOut += 1;
+        return;
     }
 
     std::ofstream backingFile(BACKING_STORE_FILE, std::ios::app);
@@ -301,8 +316,6 @@ void PagingAllocator::swapOut(const int frameIndex) {
     }
 
     backingFile << pid << " " << pageNumber << "\n";
-
-    const auto& data = frameTable[frameIndex].data;
     const int memSize = static_cast<int>(data.size());
 
     int i = 0;
@@ -348,11 +361,16 @@ void PagingAllocator::swapOut(const int frameIndex) {
         }
     }
 
-    process->swapPageOut(pageNumber);
-    this->numPagedOut += 1;
     freeFrame(frameIndex);
+    this->numPagedOut += 1;
 }
-std::vector<std::optional<StoredData>> PagingAllocator::swapIn(int pid, int pageNumber) const {
+std::vector<std::optional<StoredData>> PagingAllocator::swapIn(std::shared_ptr<Process> process, int pageNumber) const {
+    const auto pid = process->getID();
+
+    if (pid < 0 || pageNumber < 0) {
+        throw std::invalid_argument("Invalid pid/page number for swapIn.");
+    }
+
     std::ifstream backingFile(BACKING_STORE_FILE);
     if (!backingFile.is_open())
         throw std::runtime_error("Failed to open backing store file.");

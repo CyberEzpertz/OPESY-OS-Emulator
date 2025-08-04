@@ -200,12 +200,13 @@ bool Process::setVariable(const std::string& name, const uint16_t value) {
 
     const auto frame = pageTable[page].frameNumber;
     PagingAllocator::getInstance().writeToFrame(frame, offset, value);
+    pageTable[page].isDirty = true;
 
     return true;
 }
 
 uint16_t Process::getVariable(const std::string& name) {
-    std::lock_guard lock(variableMutex);
+    std::unique_lock lock(variableMutex);
 
     // CASE 1: Variable has been declared already
     if (variableAddresses.contains(name)) {
@@ -236,9 +237,8 @@ uint16_t Process::getVariable(const std::string& name) {
         throw std::runtime_error("Tried to declare new variable while reading but memory exceeded");
     }
 
-    const uint16_t nextAddress = symbolTableStart + variableOrder.size() * VARIABLE_SIZE;
-    variableAddresses[name] = nextAddress;
-    variableOrder.push_back(name);
+    lock.unlock();
+    declareVariable(name, 0);
 
     // Return 0 since it's an uninitialized variable
     return 0;
@@ -284,6 +284,7 @@ bool Process::declareVariable(const std::string& name, uint16_t value) {
     // Write initial value
     const auto frame = pageTable[page].frameNumber;
     PagingAllocator::getInstance().writeToFrame(frame, offset, value);
+    pageTable[page].isDirty = true;
 
     // Track variable
     variableAddresses[name] = nextAddress;
@@ -306,18 +307,26 @@ PageEntry Process::getPageEntry(const int pageNumber) const {
     return pageTable[pageNumber];
 }
 
-void Process::swapPageOut(const int pageNumber) {
+// Returns whether it was a dirty page or not
+bool Process::swapPageOut(const int pageNumber) {
     std::lock_guard lock(pageTableMutex);
-    pageTable[pageNumber].isValid = false;
-    pageTable[pageNumber].inBackingStore = true;
-    pageTable[pageNumber].frameNumber = -1;
+    auto& page = pageTable[pageNumber];
+
+    page.frameNumber = -1;
+    page.isValid = false;
+    if (page.isDirty) {
+        page.inBackingStore = true;
+    }
+
+    return page.isDirty;
 }
 
 void Process::swapPageIn(const int pageNumber, const int frameNumber) {
     std::lock_guard lock(pageTableMutex);
-    pageTable[pageNumber].isValid = true;
-    pageTable[pageNumber].inBackingStore = false;
-    pageTable[pageNumber].frameNumber = frameNumber;
+    auto& page = pageTable[pageNumber];
+    page.isValid = true;
+    page.inBackingStore = false;
+    page.frameNumber = frameNumber;
 }
 
 void Process::shutdown(int invalidAddress) {
@@ -372,8 +381,8 @@ void Process::writeToHeap(const int address, const uint16_t value) {
     safePageFault(page);
 
     const auto frameNumber = pageTable[page].frameNumber;
-
     PagingAllocator::getInstance().writeToFrame(frameNumber, offset, value);
+    pageTable[page].isDirty = true;
 }
 
 PageData Process::getPageData(const int pageNumber) const {
@@ -382,16 +391,18 @@ PageData Process::getPageData(const int pageNumber) const {
     const int end = start + pageSize;
 
     std::vector<std::optional<StoredData>> data;
+    data.reserve((end - start) * 2);
+
     // Iterate through the memory
     for (int i = start; i < end; i += 2) {
         if (i < segmentBoundaries.at(TEXT)) {
             auto instruction = instructions[i / INSTRUCTION_SIZE];
-            data.push_back(instruction);
-            data.push_back(std::nullopt);
+            data.emplace_back(instruction);
+            data.emplace_back(std::nullopt);
         } else {
             // Will be 0 because no variables/memory has been written to yet
-            data.push_back(static_cast<uint16_t>(0));
-            data.push_back(static_cast<uint16_t>(0));
+            data.emplace_back(static_cast<uint16_t>(0));
+            data.emplace_back(static_cast<uint16_t>(0));
         }
     }
 
