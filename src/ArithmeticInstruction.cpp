@@ -1,7 +1,8 @@
 #include "ArithmeticInstruction.h"
 
-#include "Process.h"
 #include <format>
+
+#include "Process.h"
 
 ArithmeticInstruction::ArithmeticInstruction(const std::string& resultName, const Operand& lhsVar,
                                              const Operand& rhsVar, const Operation& operation, const int pid)
@@ -59,6 +60,7 @@ std::string ArithmeticInstruction::getOperandString(const Operand& operand) cons
 std::string ArithmeticInstruction::serialize() const {
     auto lhsStr = getOperandString(lhsVar);
     auto rhsStr = getOperandString(rhsVar);
+    auto opCode = operation == ADD ? "ADD" : "SUB";
 
-    return std::format("ARITH {} {} {} {} {}", resultName, lhsStr, rhsStr, static_cast<int>(operation), pid);
+    return std::format("{} {} {} {} {}", opCode, resultName, lhsStr, rhsStr, pid);
 }

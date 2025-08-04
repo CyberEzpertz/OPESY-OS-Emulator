@@ -19,5 +19,5 @@ void SleepInstruction::execute() {
 }
 
 std::string SleepInstruction::serialize() const {
-    return std::format("SLEEP {} {}", ticks, pid);
+    return std::format("SLP {} {}", ticks, pid);
 }

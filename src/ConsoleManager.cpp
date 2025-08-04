@@ -1,9 +1,9 @@
 #include "ConsoleManager.h"
 
-#include <print>
-#include <sstream>
 #include <algorithm>
 #include <cmath>
+#include <print>
+#include <sstream>
 
 #include "InstructionFactory.h"
 #include "MainScreen.h"
@@ -15,7 +15,7 @@
 // Constants for memory validation
 constexpr int MIN_MEMORY_SIZE = 64;
 constexpr int MAX_MEMORY_SIZE = 65536;
-constexpr int INSTRUCTION_SIZE = 2;  // bytes
+constexpr int INSTRUCTION_SIZE = 2;    // bytes
 constexpr int SYMBOL_TABLE_SIZE = 64;  // bytes
 constexpr int MIN_INSTRUCTIONS = 1;
 constexpr int MAX_INSTRUCTIONS = 50;
@@ -93,12 +93,11 @@ std::vector<std::string> ConsoleManager::parseInstructions(const std::string& in
 
     while (std::getline(ss, instruction, ';')) {
         // Trim whitespace
-        instruction.erase(instruction.begin(),
-            std::find_if(instruction.begin(), instruction.end(),
-                [](unsigned char ch) { return !std::isspace(ch); }));
+        instruction.erase(instruction.begin(), std::find_if(instruction.begin(), instruction.end(),
+                                                            [](unsigned char ch) { return !std::isspace(ch); }));
         instruction.erase(
-            std::find_if(instruction.rbegin(), instruction.rend(),
-                [](unsigned char ch) { return !std::isspace(ch); }).base(),
+            std::find_if(instruction.rbegin(), instruction.rend(), [](unsigned char ch) { return !std::isspace(ch); })
+                .base(),
             instruction.end());
 
         if (!instruction.empty()) {
@@ -120,9 +119,8 @@ bool ConsoleManager::validateInstructionsFitMemory(const std::vector<std::string
 }
 
 /// Creates a process with custom instructions and memory size
-bool ConsoleManager::createProcessWithCustomInstructions(const std::string& processName,
-                                                        int memSize,
-                                                        const std::string& instrStr) {
+bool ConsoleManager::createProcessWithCustomInstructions(const std::string& processName, int memSize,
+                                                         const std::string& instrStr) {
     // Check if process name already exists
     if (processNameMap.contains(processName)) {
         std::println("Error: Process '{}' already exists.", processName);
@@ -146,12 +144,11 @@ bool ConsoleManager::createProcessWithCustomInstructions(const std::string& proc
     // Validate instruction count and memory fit
     if (!validateInstructionsFitMemory(instructionStrings, memSize)) {
         if (instructionStrings.size() < MIN_INSTRUCTIONS || instructionStrings.size() > MAX_INSTRUCTIONS) {
-            std::println("Error: Number of instructions must be between {} and {}.",
-                        MIN_INSTRUCTIONS, MAX_INSTRUCTIONS);
+            std::println("Error: Number of instructions must be between {} and {}.", MIN_INSTRUCTIONS,
+                         MAX_INSTRUCTIONS);
         } else {
             int requiredMemory = (instructionStrings.size() * INSTRUCTION_SIZE) + SYMBOL_TABLE_SIZE;
-            std::println("Error: Instructions require {} bytes but only {} bytes available.",
-                        requiredMemory, memSize);
+            std::println("Error: Instructions require {} bytes but only {} bytes available.", requiredMemory, memSize);
         }
         return false;
     }
@@ -184,8 +181,8 @@ bool ConsoleManager::createProcessWithCustomInstructions(const std::string& proc
     newProcess->setInstructions(instructions, false);
     ProcessScheduler::getInstance().scheduleProcess(newProcess);
 
-    std::println("Process '{}' created successfully with {} instructions and {} bytes of memory.",
-                processName, instructions.size(), memSize);
+    std::println("Process '{}' created successfully with {} instructions and {} bytes of memory.", processName,
+                 instructions.size(), memSize);
 
     return true;
 }
@@ -213,11 +210,11 @@ bool ConsoleManager::createProcess(const std::string& processName) {
     return true;
 }
 
-bool ConsoleManager::createDummyProcess(const std::string& processName) {
+std::shared_ptr<Process> ConsoleManager::createDummyProcess(const std::string& processName) {
     // Don't allow duplicate process names because we use that to access them
     if (processNameMap.contains(processName)) {
         std::println("Error: Process '{}' already exists.", processName);
-        return false;
+        return nullptr;
     }
 
     std::unique_lock lock(processListMutex);
@@ -235,9 +232,8 @@ bool ConsoleManager::createDummyProcess(const std::string& processName) {
         InstructionFactory::generateInstructions(PID, processName, requiredMemory);
 
     newProcess->setInstructions(instructions, true);
-    ProcessScheduler::getInstance().scheduleProcess(newProcess);
 
-    return true;
+    return newProcess;
 }
 
 /// Clears the terminal output using platform-specific commands.

@@ -9,7 +9,7 @@
 
 PrintInstruction::PrintInstruction(const std::string& msg, const int pid)
     : Instruction(1, pid), message(msg), varName("") {
-    this->opCode = "PRINT";
+    this->opCode = "PRT";
 }
 
 PrintInstruction::PrintInstruction(const std::string& msg, const int pid, const std::string& varName)
@@ -35,7 +35,7 @@ std::string PrintInstruction::serialize() const {
     const bool hasVar = varName != "";
     std::ostringstream oss;
 
-    oss << "PRINT " << pid << ' ' << hasVar << ' ';
+    oss << "PRT " << pid << ' ' << hasVar << ' ';
     if (hasVar)
         oss << varName << ' ';
 

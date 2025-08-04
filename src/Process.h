@@ -19,8 +19,9 @@ enum MemorySegment { TEXT, DATA, HEAP };
 
 struct PageEntry {
     int frameNumber = -1;
-    bool isValid;
-    bool inBackingStore;
+    bool isValid = false;
+    bool inBackingStore = false;
+    bool isDirty = false;
 };
 
 using PageData = std::vector<std::optional<StoredData>>;
@@ -118,7 +119,7 @@ public:
     PageEntry getPageEntry(int pageNumber) const;
     PageData getPageData(int pageNumber) const;
 
-    void swapPageOut(int pageNumber);
+    bool swapPageOut(int pageNumber);
     void swapPageIn(int pageNumber, int frameNumber);
     void shutdown(int invalidAddress);
 
@@ -126,8 +127,12 @@ public:
     uint16_t readFromHeap(int address);
     std::uint64_t getMemoryUsage() const;
     void precomputeInstructionPages();
-    bool isShutdown() const { return didShutdown; }
-    std::string getShutdownReason() const { return shutdownDetails; }
+    bool isShutdown() const {
+        return didShutdown;
+    }
+    std::string getShutdownReason() const {
+        return shutdownDetails;
+    }
 
 private:
     int processID;                  ///< Unique identifier for the process.

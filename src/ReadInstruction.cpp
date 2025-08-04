@@ -16,5 +16,5 @@ void ReadInstruction::execute() {
 }
 
 std::string ReadInstruction::serialize() const {
-    return std::format("READ {} {} {}", variableName, address, pid);
+    return std::format("R {} {} {}", variableName, address, pid);
 }

@@ -8,6 +8,7 @@
 #include <iosfwd>
 #include <optional>
 #include <print>
+#include <thread>
 #include <variant>
 #include <vector>
 
@@ -24,44 +25,51 @@ PagingAllocator& PagingAllocator::getInstance() {
 }
 
 PageFaultResult PagingAllocator::handlePageFault(const int pid, const int pageNumber) {
-    std::vector<std::optional<StoredData>> pageData;
-    // Can be used if there's a limit on page faults
     constexpr int maxAttempts = 10;
     int attempts = 0;
 
     const auto process = ConsoleManager::getInstance().getProcessByPID(pid);
 
-    // Load page data BEFORE retry loop (only once!)
+    if (!process) {
+        throw new std::runtime_error("Tried to handle page fault of non-existent process.");
+    }
+
+    // Load page data only once
+    std::vector<std::optional<StoredData>> pageData;
     {
         std::lock_guard lock(pagingMutex);
         const PageEntry entry = process->getPageEntry(pageNumber);
-        pageData = entry.inBackingStore ? swapIn(pid, pageNumber) : process->getPageData(pageNumber);
+        pageData = entry.inBackingStore ? swapIn(process, pageNumber) : process->getPageData(pageNumber);
     }
 
     while (true) {
-        {
-            std::lock_guard lock(pagingMutex);
+        std::lock_guard lock(pagingMutex);
 
-            int frameIndex = allocateFrame(pid, pageNumber, pageData);
-
-            if (frameIndex != -1) {
-                process->swapPageIn(pageNumber, frameIndex);
-                this->numPagedIn += 1;
-                return SUCCESS;
-            }
-
-            const bool evicted = evictVictimFrame();
-
-            if (!evicted) {
-                // No evictable frame; give other threads a chance and retry
-            }
+        int frameIndex = allocateFrame(pid, pageNumber, pageData);
+        if (frameIndex != -1) {
+            process->swapPageIn(pageNumber, frameIndex);
+            ++numPagedIn;
+            return SUCCESS;
         }
 
-        // if (++attempts >= maxAttempts) {
-        //     return DEFERRED;
-        // }
-        // std::this_thread::yield();
+        if (!evictVictimFrame()) {
+            ++attempts;
+            std::this_thread::yield();
+            continue;
+        }
+
+        // Retry allocation after eviction
+        frameIndex = allocateFrame(pid, pageNumber, pageData);
+        if (frameIndex == -1) {
+            throw std::runtime_error("Failed to allocate frame after successful eviction");
+        }
+
+        process->swapPageIn(pageNumber, frameIndex);
+        ++numPagedIn;
+        return SUCCESS;
     }
+
+    return DEFERRED;
 }
 
 void PagingAllocator::deallocate(const int pid) {
@@ -169,25 +177,38 @@ bool PagingAllocator::pinFrame(const int frameNumber, const int pid, const int p
 }
 
 StoredData PagingAllocator::readFromFrame(const int frameNumber, const int offset) {
+    if (frameNumber < 0 || frameNumber >= static_cast<int>(frameTable.size()))
+        throw new std::runtime_error("Invalid frame number");
+
+    if (offset < 0 || offset + 1 >= static_cast<int>(frameTable[frameNumber].data.size()))
+        throw new std::runtime_error("Invalid offset");
+
     std::lock_guard lock(pagingMutex);
     const auto data = frameTable[frameNumber].data[offset];
 
-    if (data.has_value()) {
-        frameTable[frameNumber].isPinned = false;
-        if (std::holds_alternative<uint16_t>(data.value())) {
-            auto valOpt = readUint16FromFrame(frameNumber, offset);
-
-            if (valOpt) {
-                return {*valOpt};
-            }
-        }
-
-        return data.value();
+    if (!data.has_value()) {
+        throw std::runtime_error("Tried accessing 2nd byte - Possible misaligned address");
     }
 
-    throw std::runtime_error("Tried accessing 2nd byte - Possible misaligned address");
+    frameTable[frameNumber].isPinned = false;
+    if (std::holds_alternative<uint16_t>(data.value())) {
+        auto valOpt = readUint16FromFrame(frameNumber, offset);
+
+        if (valOpt) {
+            return {*valOpt};
+        }
+    }
+
+    return data.value();
 }
+
 void PagingAllocator::writeToFrame(const int frameNumber, const int offset, const uint16_t data) {
+    if (frameNumber < 0 || frameNumber >= static_cast<int>(frameTable.size()))
+        throw new std::runtime_error("Invalid frame number");
+
+    if (offset < 0 || offset + 1 >= static_cast<int>(frameTable[frameNumber].data.size()))
+        throw new std::runtime_error("Invalid offset");
+
     std::lock_guard lock(pagingMutex);
     frameTable[frameNumber].isPinned = false;
 
@@ -237,19 +258,6 @@ bool PagingAllocator::evictVictimFrame() {
     if (victimFrame == -1)
         return false;
 
-    auto& [victimPID, victimPageNum, _, _pinned] = frameTable[victimFrame];
-
-    // Update victim's page table
-    const auto victimProcess = ConsoleManager::getInstance().getProcessByPID(victimPID);
-
-    if (victimProcess) {
-        victimProcess->swapPageOut(victimPageNum);
-    } else {
-        const auto error = std::format("Tried swapping out invalid process with PID {}", victimPID);
-        throw std::runtime_error(error);
-    }
-
-    // Write frame to backing store
     swapOut(victimFrame);
 
     return true;
@@ -283,13 +291,24 @@ void PagingAllocator::freeFrame(const int frameIndex) {
 
 void PagingAllocator::swapOut(const int frameIndex) {
     if (frameIndex < 0 || frameIndex >= static_cast<int>(frameTable.size())) {
-        throw std::out_of_range("Invalid frame index for swapOut.");
+        throw new std::runtime_error("Invalid frame index for swapOut.");
     }
 
-    const auto& [pid, pageNumber, _, _pinned] = frameTable[frameIndex];
+    const auto& [pid, pageNumber, data, _pinned] = frameTable[frameIndex];
     const auto process = ConsoleManager::getInstance().getProcessByPID(pid);
+
     if (!process) {
         throw std::runtime_error("Process not found during swapOut.");
+    }
+
+    // swapPageOut returns whether the page is dirtied
+    auto isDirty = process->swapPageOut(pageNumber);
+
+    // We only write to backing store if it was dirtied
+    if (!isDirty) {
+        freeFrame(frameIndex);
+        this->numPagedOut += 1;
+        return;
     }
 
     std::ofstream backingFile(BACKING_STORE_FILE, std::ios::app);
@@ -298,8 +317,6 @@ void PagingAllocator::swapOut(const int frameIndex) {
     }
 
     backingFile << pid << " " << pageNumber << "\n";
-
-    const auto& data = frameTable[frameIndex].data;
     const int memSize = static_cast<int>(data.size());
 
     int i = 0;
@@ -331,35 +348,33 @@ void PagingAllocator::swapOut(const int frameIndex) {
                 }
             }
 
-            backingFile << "VAL " << start << " " << combined;
+            backingFile << "V " << start << " " << combined;
             if (count > 1) {
                 backingFile << " x" << count;
             }
             backingFile << "\n";
         } else if (data[i].has_value() && std::holds_alternative<std::shared_ptr<Instruction>>(data[i].value())) {
             const auto& instr = std::get<std::shared_ptr<Instruction>>(data[i].value());
-            backingFile << "INS " << i << " " << instr->serialize() << "\n";
+            backingFile << "I " << i << " " << instr->serialize() << "\n";
             ++i;
         } else {
             ++i;
         }
     }
 
-    process->swapPageOut(pageNumber);
-    this->numPagedOut += 1;
     freeFrame(frameIndex);
+    this->numPagedOut += 1;
 }
+std::vector<std::optional<StoredData>> PagingAllocator::swapIn(std::shared_ptr<Process> process, int pageNumber) const {
+    const auto pid = process->getID();
 
-std::vector<std::optional<StoredData>> PagingAllocator::swapIn(int pid, int pageNumber) const {
+    if (pid < 0 || pageNumber < 0) {
+        throw std::invalid_argument("Invalid pid/page number for swapIn.");
+    }
+
     std::ifstream backingFile(BACKING_STORE_FILE);
-    std::ofstream tempFile("temp.txt");
-
-    if (!backingFile.is_open()) {
+    if (!backingFile.is_open())
         throw std::runtime_error("Failed to open backing store file.");
-    }
-    if (!tempFile.is_open()) {
-        throw std::runtime_error("Failed to open temporary backing store file.");
-    }
 
     std::vector<std::optional<StoredData>> storedData(Config::getInstance().getMemPerFrame(), std::nullopt);
     std::string line;
@@ -370,71 +385,56 @@ std::vector<std::optional<StoredData>> PagingAllocator::swapIn(int pid, int page
         int readPID, readPage;
 
         if ((iss >> readPID >> readPage)) {
-            if (inTargetBlock) {
-                tempFile << line << "\n";
-                inTargetBlock = false;
-                continue;
-            }
-
-            if (readPID == pid && readPage == pageNumber) {
-                inTargetBlock = true;
-                continue;
-            }
+            inTargetBlock = (readPID == pid && readPage == pageNumber);
+            continue;
         }
 
-        if (inTargetBlock) {
-            if (line.starts_with("VAL")) {
-                std::string tag;
-                int offset;
-                uint16_t value;
-                size_t xIndex = line.find(" x");
+        if (!inTargetBlock)
+            continue;
 
-                int count = 1;
-                if (xIndex != std::string::npos) {
-                    std::string prefix = line.substr(0, xIndex);
-                    std::string suffix = line.substr(xIndex + 2);
-                    std::istringstream(prefix) >> tag >> offset >> value;
-                    count = std::stoi(suffix);
-                } else {
-                    iss.clear();
-                    iss.str(line);
-                    iss >> tag >> offset >> value;
-                }
+        if (line.starts_with("V")) {
+            std::string tag;
+            int offset;
+            uint16_t value;
+            size_t xIndex = line.find(" x");
 
-                for (int i = 0; i < count; ++i) {
-                    int addr = offset + (i * 2);
-                    if (addr + 1 < static_cast<int>(storedData.size())) {
-                        auto high = static_cast<uint8_t>((value >> 8) & 0xFF);
-                        auto low = static_cast<uint8_t>(value & 0xFF);
-                        storedData[addr] = static_cast<uint16_t>(high);
-                        storedData[addr + 1] = static_cast<uint16_t>(low);
-                    }
-                }
-            } else if (line.starts_with("INS")) {
-                std::string tag;
-                int offset;
+            int count = 1;
+            if (xIndex != std::string::npos) {
+                std::string prefix = line.substr(0, xIndex);
+                std::string suffix = line.substr(xIndex + 2);
+                std::istringstream(prefix) >> tag >> offset >> value;
+                count = std::stoi(suffix);
+            } else {
                 iss.clear();
                 iss.str(line);
-                iss >> tag >> offset;
+                iss >> tag >> offset >> value;
+            }
 
-                std::string serializedInstr = line.substr(line.find_first_of(" \t", 4) + 1);
-                std::istringstream instrStream(serializedInstr);
-                auto instr = InstructionFactory::deserializeInstruction(instrStream);
-
-                if (offset >= 0 && offset < static_cast<int>(storedData.size())) {
-                    storedData[offset] = instr;
+            for (int i = 0; i < count; ++i) {
+                int addr = offset + (i * 2);
+                if (addr + 1 < static_cast<int>(storedData.size())) {
+                    auto high = static_cast<uint8_t>((value >> 8) & 0xFF);
+                    auto low = static_cast<uint8_t>(value & 0xFF);
+                    storedData[addr] = static_cast<uint16_t>(high);
+                    storedData[addr + 1] = static_cast<uint16_t>(low);
                 }
             }
-        } else {
-            tempFile << line << "\n";
+        } else if (line.starts_with("I")) {
+            std::string tag;
+            int offset;
+            iss.clear();
+            iss.str(line);
+            iss >> tag >> offset;
+
+            std::string serializedInstr = line.substr(line.find_first_of(" \t", 2) + 1);
+            std::istringstream instrStream(serializedInstr);
+            auto instr = InstructionFactory::deserializeInstruction(instrStream);
+
+            if (offset >= 0 && offset < static_cast<int>(storedData.size())) {
+                storedData[offset] = instr;
+            }
         }
     }
-
-    backingFile.close();
-    tempFile.close();
-
-    std::remove(BACKING_STORE_FILE);
-    std::rename("temp.txt", BACKING_STORE_FILE);
 
     return storedData;
 }
