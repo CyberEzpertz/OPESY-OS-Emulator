@@ -182,7 +182,21 @@ void MainScreen::handleScreenCommand(const std::vector<std::string>& tokens) {
         const std::string& processName = tokens[2];
 
         if (flag == "-s") {
-            if (console.createProcess(processName)) {
+            if (tokens.size() == 3) {
+                std::println("Required memory size must be specified!");
+                return;
+            }
+
+            int memSize;
+
+            try {
+                memSize = std::stoi(tokens[3]);
+            } catch (const std::exception& e) {
+                std::println("Error: Invalid memory size '{}'. Must be a number.", tokens[3]);
+                return;
+            }
+
+            if (console.createProcess(processName, memSize)) {
                 console.switchConsole(processName);
             }
         } else {  // -r

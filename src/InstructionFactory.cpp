@@ -70,7 +70,9 @@ std::vector<std::shared_ptr<Instruction>> InstructionFactory::generateInstructio
     // Leave a chance of error for the READ/WRITEs
     constexpr double errorChance = 0.01;
     const int errorMemory = requiredMemory * errorChance;
-    const int endMemory = startMemory + requiredMemory - SYMBOL_TABLE_SIZE + errorMemory;
+
+    // requiredMemory - SYMBOL_TABLE_SIZE because startMemory already contains that
+    const int endMemory = startMemory + (requiredMemory - SYMBOL_TABLE_SIZE) + errorMemory;
 
     while (accumulatedLines < randMaxLines) {
         const int remainingLines = randMaxLines - accumulatedLines;
@@ -126,6 +128,7 @@ std::shared_ptr<Instruction> InstructionFactory::createRandomInstruction(const i
     const std::string msg = std::format("Hello world from {}.", processName);
 
     const bool isLoopable = currentNestLevel < MAX_NESTED_LEVELS && maxLines > 1;
+    const bool hasHeapSpace = startMemory < endMemory;
 
     switch (generateRandomNum(0, isLoopable ? 7 : 6)) {
         case 0: {  // PRINT VARIABLE VALUE
@@ -184,7 +187,11 @@ std::shared_ptr<Instruction> InstructionFactory::createRandomInstruction(const i
             return std::make_shared<ArithmeticInstruction>(result, lhs, rhs, Operation::SUBTRACT, pid);
         }
         case 5: {  // WRITE(address, value)
+            if (!hasHeapSpace)
+                return std::make_shared<PrintInstruction>(msg, pid);
+
             bool hasVar = generateRandomNum(0, 1) % 2 == 1;
+
             int address = generateRandomNum(startMemory, endMemory - 2);
 
             if (hasVar) {
@@ -196,6 +203,9 @@ std::shared_ptr<Instruction> InstructionFactory::createRandomInstruction(const i
             return std::make_shared<WriteInstruction>(address, varName, pid);
         }
         case 6: {  // READ(var, address)
+            if (!hasHeapSpace)
+                return std::make_shared<PrintInstruction>(msg, pid);
+
             std::string result = getRandomVarName(declaredVars);
             int address = generateRandomNum(startMemory, endMemory - 2);
             return std::make_shared<ReadInstruction>(result, address, pid);

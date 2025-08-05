@@ -1,9 +1,10 @@
 #include "ConsoleManager.h"
 
-#include <algorithm>
-#include <cmath>
 #include <print>
 #include <sstream>
+#include <algorithm>
+#include <cmath>
+#include <cstdint>
 
 #include "InstructionFactory.h"
 #include "MainScreen.h"
@@ -189,22 +190,27 @@ bool ConsoleManager::createProcessWithCustomInstructions(const std::string& proc
 
 /// Creates and registers a process using its name for future switching.
 /// Returns true if creation was successful, false if not.
-bool ConsoleManager::createProcess(const std::string& processName) {
+bool ConsoleManager::createProcess(const std::string& processName, int memSize) {
     // Don't allow duplicate process names because we use that to access them
     if (processNameMap.contains(processName)) {
         std::println("Error: Process '{}' already exists.", processName);
         return false;
     }
 
+    if (!validateMemorySize(memSize)) {
+        std::println("Invalid memory allocation. Value must be a power of 2 between 64 and 65536.");
+        return false;
+    }
+
     std::unique_lock lock(processListMutex);
     const int PID = processIDList.size();
 
-    const auto newProcess = std::make_shared<Process>(PID, processName);
+    const auto newProcess = std::make_shared<Process>(PID, processName, memSize);
     processNameMap[processName] = newProcess;
     processIDList.push_back(newProcess);
 
-    const auto instructions = InstructionFactory::createAlternatingPrintAdd(PID);
-    newProcess->setInstructions(instructions);
+    // const auto instructions = InstructionFactory::createAlternatingPrintAdd(PID);
+    // newProcess->setInstructions(instructions);
     ProcessScheduler::getInstance().scheduleProcess(newProcess);
 
     return true;
