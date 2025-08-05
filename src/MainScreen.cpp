@@ -547,7 +547,8 @@ void MainScreen::generateVmStat() {
 
     std::println("{:>20} {}", idleTicks, "Idle CPU ticks");
     std::println("{:>20} {}", activeTicks, "Active CPU ticks");
-    std::println("{:>20} {}", totalTicks, "Total CPU ticks");
+    std::println("{:>20} {}", idleTicks + activeTicks, "Overall Individual CPU ticks");
+    std::println("{:>20} {}", totalTicks, "Total (Global) CPU ticks");
 
     std::println("{:>20} {}", numPagedIn, "Pages paged in");
     std::println("{:>20} {}", numPagedOut, "Pages paged out");
